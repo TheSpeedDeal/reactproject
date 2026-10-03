@@ -56,7 +56,7 @@
 .panb-app {
   min-height: 100vh;
   background-color: var(--panb-navy-950);
-  background-image: 
+  background-image:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 182, 212, 0.15), transparent),
     radial-gradient(ellipse 60% 40% at 85% 60%, rgba(99, 102, 241, 0.06), transparent);
   color: var(--text-body);
@@ -173,8 +173,17 @@
 }
 
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.3); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(1.3);
+  }
 }
 
 .brand-main-title {
@@ -312,7 +321,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-card h3 {
@@ -661,20 +672,45 @@
   white-space: nowrap;
 }
 
-.kpi-success .kpi-val { color: var(--panb-emerald); }
-.kpi-success { border-bottom: 3px solid var(--panb-emerald); }
+.kpi-success .kpi-val {
+  color: var(--panb-emerald);
+}
 
-.kpi-warning .kpi-val { color: var(--panb-amber); }
-.kpi-warning { border-bottom: 3px solid var(--panb-amber); }
+.kpi-success {
+  border-bottom: 3px solid var(--panb-emerald);
+}
 
-.kpi-danger .kpi-val { color: var(--panb-rose); }
-.kpi-danger { border-bottom: 3px solid var(--panb-rose); }
+.kpi-warning .kpi-val {
+  color: var(--panb-amber);
+}
 
-.kpi-info .kpi-val { color: var(--panb-cyan); }
-.kpi-info { border-bottom: 3px solid var(--panb-cyan); }
+.kpi-warning {
+  border-bottom: 3px solid var(--panb-amber);
+}
 
-.kpi-accent .kpi-val { color: #a78bfa; }
-.kpi-accent { border-bottom: 3px solid #8b5cf6; }
+.kpi-danger .kpi-val {
+  color: var(--panb-rose);
+}
+
+.kpi-danger {
+  border-bottom: 3px solid var(--panb-rose);
+}
+
+.kpi-info .kpi-val {
+  color: var(--panb-cyan);
+}
+
+.kpi-info {
+  border-bottom: 3px solid var(--panb-cyan);
+}
+
+.kpi-accent .kpi-val {
+  color: #a78bfa;
+}
+
+.kpi-accent {
+  border-bottom: 3px solid #8b5cf6;
+}
 
 /* ==========================================================================
    View Mode Tabs
@@ -1094,6 +1130,7 @@
   border: 1px solid rgba(16, 185, 129, 0.35);
   color: #34d399;
 }
+
 .status-success .status-dot {
   background: #10b981;
   box-shadow: 0 0 6px #10b981;
@@ -1104,6 +1141,7 @@
   border: 1px solid rgba(245, 158, 11, 0.35);
   color: #fbbf24;
 }
+
 .status-warning .status-dot {
   background: #f59e0b;
   box-shadow: 0 0 6px #f59e0b;
@@ -1114,6 +1152,7 @@
   border: 1px solid rgba(244, 63, 94, 0.35);
   color: #fda4af;
 }
+
 .status-danger .status-dot {
   background: #f43f5e;
   box-shadow: 0 0 6px #f43f5e;
@@ -1306,8 +1345,15 @@
 }
 
 @keyframes modal-pop {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .modal-header {
