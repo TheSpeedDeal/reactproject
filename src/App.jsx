@@ -6,8 +6,11 @@ import {
   isTargetSheet,
   getFacilityType,
   parsePlantWorksheet,
-  exportTableToCsv
+  exportTableToCsv,
+  isSharePointUrl,
+  formatSharepointUrl
 } from './utils/excelParser';
+import HomeDashboard from './components/HomeDashboard';
 import './App.css';
 
 export default function App() {
@@ -21,6 +24,9 @@ export default function App() {
   const [fileSize, setFileSize] = useState('');
   const [sourceType, setSourceType] = useState('default'); // 'default' | 'local'
   
+  // Top-Level Navigation Tabs: 'home' | 'table'
+  const [activeHeaderTab, setActiveHeaderTab] = useState('home');
+  
   // Loading & Alert State
   const [isLoading, setIsLoading] = useState(true);
   const [loadingText, setLoadingText] = useState('Loading PANB Permits & Licenses Monitoring 2026...');
@@ -28,6 +34,10 @@ export default function App() {
   const [infoMessage, setInfoMessage] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadModalTab, setUploadModalTab] = useState('file'); // 'file' | 'url'
+  const [sharePointUrl, setSharePointUrl] = useState('');
+  const [urlLoadError, setUrlLoadError] = useState('');
+  const [urlLoading, setUrlLoading] = useState(false);
 
   // Plant Navigation & Filter State
   const [facilityTypeFilter, setFacilityTypeFilter] = useState('ALL');
@@ -71,6 +81,19 @@ export default function App() {
     setReportRegulatoryFilter('ALL');
     setReportSort({ key: 'rowIndex', direction: 'asc' });
     setReportPage(1);
+  }, []);
+
+  // Jump from Home Dashboard to specific plant in Table tab
+  const handleNavigateToTable = useCallback((plantName, searchFilter) => {
+    setActiveHeaderTab('table');
+    if (plantName) {
+      setActiveSheetName(plantName);
+    }
+    if (searchFilter) {
+      setPermitsSearch(searchFilter);
+      setPermitsPage(1);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
   // Process ArrayBuffer from fetch or file picker
@@ -192,6 +215,56 @@ export default function App() {
 
     reader.readAsArrayBuffer(file);
   };
+
+  // Handle SharePoint / OneDrive URL fetch
+  const handleSharePointUrl = useCallback(async () => {
+    const raw = sharePointUrl.trim();
+    if (!raw) {
+      setUrlLoadError('Please paste a SharePoint or OneDrive link.');
+      return;
+    }
+    if (!isSharePointUrl(raw)) {
+      setUrlLoadError('URL must be from sharepoint.com, onedrive.live.com, or 1drv.ms.');
+      return;
+    }
+
+    setUrlLoadError('');
+    setUrlLoading(true);
+    setLoadingText('Fetching file from SharePoint…');
+
+    const downloadUrl = formatSharepointUrl(raw);
+
+    try {
+      const response = await fetch(downloadUrl);
+      if (!response.ok) {
+        throw new Error(`SharePoint returned HTTP ${response.status}. Make sure the link is set to "Anyone with the link can view".`);
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        throw new Error('Received an HTML login page instead of the file. Ensure the SharePoint link allows anonymous access ("Anyone with link can view").');
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const sizeStr = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2) + ' MB';
+      // Derive a friendly filename from the URL
+      let urlName = 'sharepoint-file.xlsx';
+      try {
+        const u = new URL(downloadUrl);
+        const parts = u.pathname.split('/');
+        const last = parts[parts.length - 1];
+        if (last && last.match(/\.xlsx?$/i)) urlName = decodeURIComponent(last);
+      } catch (_) {}
+
+      setUrlLoading(false);
+      setSharePointUrl('');
+      processWorkbookData(arrayBuffer, urlName, sizeStr, 'sharepoint');
+    } catch (err) {
+      console.error('SharePoint fetch error:', err);
+      setUrlLoadError(err.message);
+      setUrlLoading(false);
+    }
+  }, [sharePointUrl, processWorkbookData, setLoadingText]);
 
   // Drag and drop handlers
   const handleDragOver = (e) => {
@@ -630,6 +703,30 @@ export default function App() {
           </div>
         </div>
 
+        {/* Header Tabs: Home - Table */}
+        <nav className="header-nav-tabs" aria-label="Main Navigation">
+          <button
+            type="button"
+            className={`header-tab-btn ${activeHeaderTab === 'home' ? 'active' : ''}`}
+            onClick={() => setActiveHeaderTab('home')}
+            id="tab-btn-home"
+            title="Overview Executive Dashboard"
+          >
+            <span className="tab-btn-icon">🏠</span>
+            <span className="tab-btn-text">Home</span>
+          </button>
+          <button
+            type="button"
+            className={`header-tab-btn ${activeHeaderTab === 'table' ? 'active' : ''}`}
+            onClick={() => setActiveHeaderTab('table')}
+            id="tab-btn-table"
+            title="Detailed Plant Compliance Tables"
+          >
+            <span className="tab-btn-icon">📋</span>
+            <span className="tab-btn-text">Table</span>
+          </button>
+        </nav>
+
         <div className="header-actions">
           <button
             className="btn-header-secondary"
@@ -681,41 +778,114 @@ export default function App() {
 
       {/* Upload Modal */}
       {showUploadModal && (
-        <div className="modal-backdrop" onClick={() => setShowUploadModal(false)}>
+        <div className="modal-backdrop" onClick={() => { setShowUploadModal(false); setUrlLoadError(''); setSharePointUrl(''); }}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Upload Updated Monitoring File</h3>
-              <button className="modal-close-btn" onClick={() => setShowUploadModal(false)}>✕</button>
+              <h3>Load Monitoring File</h3>
+              <button className="modal-close-btn" onClick={() => { setShowUploadModal(false); setUrlLoadError(''); setSharePointUrl(''); }}>✕</button>
             </div>
-            <div className="modal-body">
-              <div
-                className="modal-dropzone"
-                onClick={() => fileInputRef.current?.click()}
+
+            {/* Tab Switcher */}
+            <div className="modal-tab-bar">
+              <button
+                className={`modal-tab-btn ${uploadModalTab === 'file' ? 'active' : ''}`}
+                onClick={() => { setUploadModalTab('file'); setUrlLoadError(''); }}
               >
-                <div className="dropzone-icon">📊</div>
-                <h4>Select or Drag &amp; Drop Spreadsheet</h4>
-                <p>Upload updated <code>.xlsx</code> or <code>.xls</code> workbook containing plant monitoring sheets.</p>
-                <button type="button" className="btn-browse-file">
-                  Browse From Computer
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                  style={{ display: 'none' }}
-                />
-              </div>
+                📂 Upload File
+              </button>
+              <button
+                className={`modal-tab-btn ${uploadModalTab === 'url' ? 'active' : ''}`}
+                onClick={() => { setUploadModalTab('url'); setUrlLoadError(''); }}
+              >
+                🔗 SharePoint URL
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* ── Tab 1: Local File ── */}
+              {uploadModalTab === 'file' && (
+                <>
+                  <div
+                    className="modal-dropzone"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="dropzone-icon">📊</div>
+                    <h4>Select or Drag &amp; Drop Spreadsheet</h4>
+                    <p>Upload updated <code>.xlsx</code> or <code>.xls</code> workbook containing plant monitoring sheets.</p>
+                    <button type="button" className="btn-browse-file">
+                      Browse From Computer
+                    </button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* ── Tab 2: SharePoint / OneDrive URL ── */}
+              {uploadModalTab === 'url' && (
+                <div className="url-upload-panel">
+                  <div className="url-upload-icon">🔗</div>
+                  <h4>Paste SharePoint or OneDrive Link</h4>
+                  <p className="url-upload-hint">
+                    The file must be shared as <strong>"Anyone with the link can view"</strong> in SharePoint.
+                    Copy the sharing link from <em>Share → Copy Link</em>.
+                  </p>
+                  <div className="url-input-row">
+                    <input
+                      type="url"
+                      className="url-text-input"
+                      placeholder="https://yourorg.sharepoint.com/:x:/s/…"
+                      value={sharePointUrl}
+                      onChange={(e) => { setSharePointUrl(e.target.value); setUrlLoadError(''); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSharePointUrl(); }}
+                      disabled={urlLoading}
+                    />
+                    <button
+                      className="btn-load-url"
+                      onClick={handleSharePointUrl}
+                      disabled={urlLoading || !sharePointUrl.trim()}
+                    >
+                      {urlLoading ? '⏳ Loading…' : 'Load'}
+                    </button>
+                  </div>
+                  {urlLoadError && (
+                    <div className="url-error-msg">⚠️ {urlLoadError}</div>
+                  )}
+                  <div className="url-tips">
+                    <span className="url-tip-label">Supported:</span>
+                    <span className="url-tip-badge">sharepoint.com</span>
+                    <span className="url-tip-badge">onedrive.live.com</span>
+                    <span className="url-tip-badge">1drv.ms</span>
+                  </div>
+                </div>
+              )}
 
               <div className="modal-note">
-                <strong>Target Filter Rule:</strong> The application automatically scans for sheets with prefixes <code>BMP</code>, <code>MPH</code>, <code>MPPP</code>, and <code>MPF</code>, and structures each into the 2 official compliance tables.
+                <strong>Target Filter Rule:</strong> The app automatically scans for sheets prefixed <code>BMP</code>, <code>MPH</code>, <code>MPPP</code>, <code>MPF</code> and structures them into the 2 official compliance tables.
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {!isLoading && targetSheets.length > 0 && (
+      {/* Home Dashboard Tab View */}
+      {activeHeaderTab === 'home' && (
+        <HomeDashboard
+          onNavigateToTable={handleNavigateToTable}
+          parsedDataCache={parsedDataCache}
+          targetSheets={targetSheets}
+          plantRegions={plantRegions}
+          isLoading={isLoading}
+        />
+      )}
+
+      {/* Table Tab View */}
+      {activeHeaderTab === 'table' && !isLoading && targetSheets.length > 0 && (
         <main className="panb-main-content">
           {/* Plant Selector & Multi-Level Filter Bar */}
           <section className="plant-selector-card">
