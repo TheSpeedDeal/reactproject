@@ -1,0 +1,336 @@
+/* ==========================================================================
+   Theme Selector Component Styles
+   Supports both 'main-header' and 'dashboard-chrome' appearances
+   ========================================================================== */
+
+.theme-selector-wrapper {
+  position: relative;
+  display: inline-block;
+  z-index: 60;
+}
+
+/* 1. Main Header Trigger Button Variant */
+.variant-header .theme-trigger-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panb-border, rgba(255, 255, 255, 0.12));
+  color: var(--text-heading, #f8fafc);
+  padding: 0.55rem 0.95rem;
+  border-radius: var(--radius-sm, 8px);
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  user-select: none;
+}
+
+.variant-header .theme-trigger-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--theme-accent, var(--panb-cyan, #06b6d4));
+  transform: translateY(-1px);
+}
+
+.variant-header .theme-trigger-btn.active {
+  border-color: var(--theme-accent, var(--panb-cyan, #06b6d4));
+  box-shadow: 0 0 12px var(--theme-accent-glow, rgba(6, 182, 212, 0.3));
+}
+
+/* 2. Power BI Dashboard Chrome Variant */
+.variant-chrome .theme-trigger-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.variant-chrome .theme-trigger-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--theme-accent, #60a5fa);
+}
+
+.variant-chrome .theme-trigger-btn.active {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: #ffffff;
+}
+
+/* Common Trigger Sub-elements */
+.theme-trigger-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.theme-trigger-label {
+  letter-spacing: 0.01em;
+}
+
+.theme-trigger-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 6px currentColor;
+  flex-shrink: 0;
+}
+
+.theme-trigger-chevron {
+  font-size: 0.7rem;
+  opacity: 0.8;
+  margin-left: 1px;
+}
+
+/* ==========================================================================
+   Theme Dropdown Panel
+   ========================================================================== */
+.theme-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 340px;
+  max-width: 90vw;
+  background: var(--panb-surface-card, #0f172a);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--panb-border-highlight, rgba(255, 255, 255, 0.14));
+  border-radius: var(--radius-md, 14px);
+  box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.5), 0 0 24px var(--theme-accent-glow, rgba(6, 182, 212, 0.2));
+  padding: 0.85rem;
+  z-index: 1000;
+  animation: theme-panel-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+@keyframes theme-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Panel Header */
+.theme-dropdown-header {
+  border-bottom: 1px solid var(--panb-border, rgba(255, 255, 255, 0.08));
+  padding-bottom: 0.6rem;
+}
+
+.theme-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.theme-header-icon {
+  font-size: 1rem;
+}
+
+.theme-header-title {
+  font-family: var(--font-display, sans-serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-white, #ffffff);
+  letter-spacing: -0.01em;
+}
+
+.theme-header-subtitle {
+  font-size: 0.74rem;
+  color: var(--text-dim, #94a3b8);
+  margin-top: 0.2rem;
+  line-height: 1.35;
+}
+
+/* Options Grid / List */
+.theme-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* Custom Scrollbar for theme options */
+.theme-options-grid::-webkit-scrollbar {
+  width: 5px;
+}
+.theme-options-grid::-webkit-scrollbar-thumb {
+  background: var(--panb-border, rgba(255, 255, 255, 0.15));
+  border-radius: 4px;
+}
+
+/* Individual Theme Option Card */
+.theme-option-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.16s ease;
+  font-family: inherit;
+  color: inherit;
+}
+
+.theme-option-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--panb-border, rgba(255, 255, 255, 0.12));
+  transform: translateX(2px);
+}
+
+.theme-option-card.selected {
+  background: var(--theme-accent-soft, rgba(6, 182, 212, 0.12));
+  border-color: var(--theme-accent, var(--panb-cyan, #06b6d4));
+  box-shadow: 0 0 14px var(--theme-accent-glow, rgba(6, 182, 212, 0.2));
+}
+
+.theme-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.theme-card-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-card-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.theme-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.theme-card-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-white, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-badge-category {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.theme-badge-category.dark {
+  background: rgba(0, 0, 0, 0.3);
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.theme-badge-category.light {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.theme-card-desc {
+  font-size: 0.7rem;
+  color: var(--text-dim, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.theme-card-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Swatch Preview Cluster */
+.theme-swatch-cluster {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 3px 5px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 3px;
+}
+
+.swatch-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.swatch-dot.accent-dot {
+  box-shadow: 0 0 5px currentColor;
+}
+
+.theme-check-badge {
+  color: var(--theme-accent, #06b6d4);
+  font-weight: 800;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+/* Panel Footer */
+.theme-dropdown-footer {
+  border-top: 1px solid var(--panb-border, rgba(255, 255, 255, 0.08));
+  padding-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-footer-note {
+  font-size: 0.68rem;
+  color: var(--text-muted, #64748b);
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .theme-dropdown-panel {
+    width: 290px;
+    right: -10px;
+  }
+}

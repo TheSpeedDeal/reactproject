@@ -1,0 +1,936 @@
+/* ==========================================================================
+   PANB UI Theme System Stylesheet
+   Supports 6 Curated Themes:
+   1. Midnight Slate (Cyber Dark Navy - Default)
+   2. Clean Enterprise (Luminous Executive Light Mode)
+   3. Emerald Forest (Eco / Sustainability Green)
+   4. Royal Cobalt (Power BI Sapphire Blue)
+   5. Sunset Amber (Executive Warm Gold)
+   6. Neon Amethyst (Cosmic Cyber Purple)
+   ========================================================================== */
+
+/* Universal Theme Smooth Transition */
+.panb-app,
+.panb-header,
+.panb-main-content,
+.plant-selector-card,
+.home-dashboard-container,
+.dash-hero-banner,
+.dash-filter-card,
+.dash-kpi-card,
+.dash-chart-card,
+.dash-table-card,
+.compliance-kpi-card,
+.data-table-container,
+.modal-card {
+  transition: background-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   1. THEME: Midnight Slate (Default Cyber Navy Dark)
+   ========================================================================== */
+:root,
+:root[data-theme="midnight"],
+[data-theme="midnight"] {
+  --theme-accent: #06b6d4;
+  --theme-accent-glow: rgba(6, 182, 212, 0.28);
+  --theme-accent-soft: rgba(6, 182, 212, 0.14);
+
+  --panb-navy-950: #060913;
+  --panb-navy-900: #0a0f1d;
+  --panb-navy-850: #0f172a;
+  --panb-navy-800: #1e293b;
+  --panb-navy-700: #334155;
+
+  --panb-cyan: #06b6d4;
+  --panb-cyan-glow: rgba(6, 182, 212, 0.25);
+  --panb-emerald: #10b981;
+  --panb-emerald-glow: rgba(16, 185, 129, 0.22);
+  --panb-amber: #f59e0b;
+  --panb-amber-glow: rgba(245, 158, 11, 0.2);
+  --panb-rose: #f43f5e;
+  --panb-rose-glow: rgba(244, 63, 94, 0.22);
+  --panb-indigo: #6366f1;
+
+  --panb-surface: rgba(15, 23, 42, 0.72);
+  --panb-surface-card: rgba(18, 27, 49, 0.82);
+  --panb-surface-hover: rgba(30, 41, 69, 0.9);
+  --panb-surface-input: rgba(11, 17, 32, 0.85);
+
+  --panb-border: rgba(255, 255, 255, 0.08);
+  --panb-border-subtle: rgba(255, 255, 255, 0.04);
+  --panb-border-highlight: rgba(6, 182, 212, 0.4);
+
+  --text-white: #ffffff;
+  --text-heading: #f8fafc;
+  --text-body: #cbd5e1;
+  --text-dim: #94a3b8;
+  --text-muted: #64748b;
+
+  --shadow-card: 0 8px 32px -4px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 24px var(--panb-cyan-glow);
+
+  --primary-gradient: linear-gradient(135deg, #0284c7 0%, #06b6d4 100%);
+  --panb-bg-gradient: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 182, 212, 0.15), transparent),
+                      radial-gradient(ellipse 60% 40% at 85% 60%, rgba(99, 102, 241, 0.06), transparent);
+  --panb-ambient-gradient: radial-gradient(ellipse at top, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
+
+  --plant-hero-bg: linear-gradient(145deg, rgba(17, 24, 39, 0.88) 0%, rgba(15, 23, 42, 0.95) 100%);
+  --plant-kpi-bg: rgba(11, 17, 32, 0.6);
+  --tabs-group-bg: rgba(15, 23, 42, 0.8);
+  --table-filters-bg: rgba(11, 17, 32, 0.65);
+  --table-viewport-bg: rgba(11, 17, 32, 0.4);
+  --table-pagination-bg: #0d1424;
+
+  /* Home Dashboard Power BI theme */
+  --pbi-canvas-bg: #0b0f19;
+  --pbi-chrome-bg: #070a13;
+  --pbi-chrome-text: #f8fafc;
+  --pbi-ribbon-bg: #0e1422;
+  --pbi-ribbon-border: rgba(255, 255, 255, 0.08);
+  --pbi-card-bg: #111827;
+  --pbi-card-border: rgba(255, 255, 255, 0.08);
+  --pbi-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --pbi-card-hover-border: rgba(6, 182, 212, 0.35);
+  --pbi-text-title: #f8fafc;
+  --pbi-text-body: #cbd5e1;
+  --pbi-text-muted: #94a3b8;
+  --pbi-text-dim: #64748b;
+  --pbi-input-bg: #0a0e1a;
+  --pbi-input-border: rgba(255, 255, 255, 0.12);
+  --pbi-input-text: #f8fafc;
+  --pbi-table-header-bg: #0d1424;
+  --pbi-table-header-text: #94a3b8;
+  --pbi-table-row-hover: rgba(6, 182, 212, 0.08);
+  --pbi-table-row-border: rgba(255, 255, 255, 0.06);
+  --pbi-accent: #06b6d4;
+  --pbi-accent-soft: rgba(6, 182, 212, 0.15);
+  --pbi-search-bg: #070a13;
+  --pbi-search-border: rgba(255, 255, 255, 0.15);
+  --pbi-search-text: #f8fafc;
+}
+
+/* ==========================================================================
+   2. THEME: Clean Enterprise (Luminous Light Mode)
+   ========================================================================== */
+:root[data-theme="light"],
+[data-theme="light"] {
+  --theme-accent: #0284c7;
+  --theme-accent-glow: rgba(2, 132, 199, 0.25);
+  --theme-accent-soft: rgba(2, 132, 199, 0.12);
+
+  --panb-navy-950: #f1f5f9;
+  --panb-navy-900: #f8fafc;
+  --panb-navy-850: #ffffff;
+  --panb-navy-800: #e2e8f0;
+  --panb-navy-700: #cbd5e1;
+
+  --panb-cyan: #0284c7;
+  --panb-cyan-glow: rgba(2, 132, 199, 0.22);
+  --panb-emerald: #059669;
+  --panb-emerald-glow: rgba(5, 150, 105, 0.2);
+  --panb-amber: #d97706;
+  --panb-amber-glow: rgba(217, 119, 6, 0.2);
+  --panb-rose: #e11d48;
+  --panb-rose-glow: rgba(225, 29, 72, 0.2);
+  --panb-indigo: #4f46e5;
+
+  --panb-surface: rgba(255, 255, 255, 0.9);
+  --panb-surface-card: #ffffff;
+  --panb-surface-hover: #f8fafc;
+  --panb-surface-input: #ffffff;
+
+  --panb-border: rgba(0, 0, 0, 0.09);
+  --panb-border-subtle: rgba(0, 0, 0, 0.05);
+  --panb-border-highlight: rgba(2, 132, 199, 0.45);
+
+  --text-white: #0f172a;
+  --text-heading: #1e293b;
+  --text-body: #334155;
+  --text-dim: #64748b;
+  --text-muted: #94a3b8;
+
+  --shadow-card: 0 8px 30px -4px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 20px rgba(2, 132, 199, 0.16);
+
+  --primary-gradient: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+  --panb-bg-gradient: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(2, 132, 199, 0.08), transparent),
+                      radial-gradient(ellipse 60% 40% at 85% 60%, rgba(99, 102, 241, 0.04), transparent);
+  --panb-ambient-gradient: radial-gradient(ellipse at top, rgba(2, 132, 199, 0.06) 0%, transparent 70%);
+
+  --plant-hero-bg: #ffffff;
+  --plant-kpi-bg: #f8fafc;
+  --tabs-group-bg: #ffffff;
+  --table-filters-bg: #ffffff;
+  --table-viewport-bg: #ffffff;
+  --table-pagination-bg: #ffffff;
+
+  /* Home Dashboard Power BI theme */
+  --pbi-canvas-bg: #edf0f5;
+  --pbi-chrome-bg: #1e293b;
+  --pbi-chrome-text: #ffffff;
+  --pbi-ribbon-bg: #f8fafc;
+  --pbi-ribbon-border: #d8dee8;
+  --pbi-card-bg: #ffffff;
+  --pbi-card-border: #d8dee8;
+  --pbi-card-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --pbi-card-hover-border: #cbd5e1;
+  --pbi-text-title: #0f172a;
+  --pbi-text-body: #334155;
+  --pbi-text-muted: #64748b;
+  --pbi-text-dim: #94a3b8;
+  --pbi-input-bg: #ffffff;
+  --pbi-input-border: #cbd5e1;
+  --pbi-input-text: #0f172a;
+  --pbi-table-header-bg: #f8fafc;
+  --pbi-table-header-text: #475569;
+  --pbi-table-row-hover: #f1f5f9;
+  --pbi-table-row-border: #f1f5f9;
+  --pbi-accent: #0284c7;
+  --pbi-accent-soft: rgba(2, 132, 199, 0.1);
+  --pbi-search-bg: #334155;
+  --pbi-search-border: #475569;
+  --pbi-search-text: #ffffff;
+}
+
+/* Light Theme Component Specific Overrides */
+[data-theme="light"] .header-nav-tabs {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .header-tab-btn {
+  color: #64748b;
+}
+
+[data-theme="light"] .header-tab-btn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+[data-theme="light"] .header-tab-btn.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%);
+  border-color: #0284c7;
+  box-shadow: 0 2px 12px rgba(2, 132, 199, 0.35);
+}
+
+[data-theme="light"] .btn-header-secondary {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+[data-theme="light"] .btn-header-secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+[data-theme="light"] .badge-org {
+  background: rgba(2, 132, 199, 0.1);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  color: #0284c7;
+}
+
+[data-theme="light"] .badge-year {
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .filter-pill {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .filter-pill:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+[data-theme="light"] .filter-pill.active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+}
+
+[data-theme="light"] .plant-pill-btn {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+[data-theme="light"] .plant-pill-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .plant-pill-btn.active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+}
+
+/* Active Plant Hero Banner */
+[data-theme="light"] .active-plant-hero {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .hero-plant-name {
+  color: #0f172a;
+}
+
+[data-theme="light"] .hero-plant-desc {
+  color: #475569;
+}
+
+[data-theme="light"] .hero-plant-desc strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .hero-tag-badge {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .facility-tag {
+  color: #0284c7;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+[data-theme="light"] .region-tag {
+  color: #059669;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+[data-theme="light"] .kpi-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .kpi-card:hover {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .kpi-label {
+  color: #475569;
+}
+
+[data-theme="light"] .kpi-sub {
+  color: #64748b;
+}
+
+/* View Mode Tabs Bar */
+[data-theme="light"] .tabs-button-group {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .tab-view-btn {
+  color: #64748b;
+}
+
+[data-theme="light"] .tab-view-btn:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+[data-theme="light"] .tab-view-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+}
+
+/* Table Section Card */
+[data-theme="light"] .compliance-table-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .section-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .section-subtitle {
+  color: #64748b;
+}
+
+[data-theme="light"] .btn-export-csv {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+[data-theme="light"] .btn-export-csv:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Table Filters & Search Container */
+[data-theme="light"] .table-filters-container {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .filter-item {
+  color: #475569;
+}
+
+[data-theme="light"] .filter-item label {
+  color: #475569;
+  font-weight: 600;
+}
+
+[data-theme="light"] .filter-text-input,
+[data-theme="light"] .filter-select {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .filter-text-input:focus,
+[data-theme="light"] .filter-select:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+}
+
+[data-theme="light"] .filter-search-field .search-icon {
+  color: #64748b;
+}
+
+/* Table Viewport & Pure Light Table Body */
+[data-theme="light"] .table-viewport-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .compliance-table {
+  background: #ffffff;
+}
+
+/* Header Table keeps its dark/authoritative color as requested */
+[data-theme="light"] .compliance-table thead th {
+  background: #0d1424;
+  color: #cbd5e1;
+  border-bottom: 2px solid #0284c7;
+}
+
+[data-theme="light"] .compliance-table thead th.sortable-th:hover {
+  background: #141d33 !important;
+  color: #ffffff;
+}
+
+/* Pure Light Table Rows & Cells */
+[data-theme="light"] .compliance-table tbody {
+  background: #ffffff;
+}
+
+[data-theme="light"] .compliance-table tbody tr {
+  background: #ffffff;
+  border-bottom: 1px solid #eef2f6;
+  color: #1e293b;
+}
+
+[data-theme="light"] .compliance-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+[data-theme="light"] .compliance-table tbody tr.row-expiring-soon {
+  background-color: #fffbeb;
+}
+
+[data-theme="light"] .compliance-table tbody tr.row-expiring-soon:hover {
+  background-color: #fef3c7;
+}
+
+[data-theme="light"] .compliance-table tbody tr.row-expired,
+[data-theme="light"] .compliance-table tbody tr.row-not-submitted {
+  background-color: #fff1f2;
+}
+
+[data-theme="light"] .compliance-table tbody tr.row-expired:hover,
+[data-theme="light"] .compliance-table tbody tr.row-not-submitted:hover {
+  background-color: #fee2e2;
+}
+
+[data-theme="light"] .compliance-table td {
+  color: #1e293b;
+}
+
+[data-theme="light"] .td-num {
+  color: #64748b;
+  font-weight: 600;
+}
+
+[data-theme="light"] .agency-pill {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+[data-theme="light"] .desc-main {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+[data-theme="light"] .desc-subcode {
+  color: #64748b;
+}
+
+[data-theme="light"] .id-code {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-weight: 600;
+}
+
+[data-theme="light"] .app-tag.app-yes {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  font-weight: 700;
+}
+
+[data-theme="light"] .app-tag.app-no {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  font-weight: 600;
+}
+
+[data-theme="light"] .status-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+  font-weight: 700;
+}
+
+[data-theme="light"] .status-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #d97706;
+  font-weight: 700;
+}
+
+[data-theme="light"] .status-danger {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #e11d48;
+  font-weight: 700;
+}
+
+[data-theme="light"] .status-neutral {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+[data-theme="light"] .days-badge.days-normal {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+[data-theme="light"] .days-badge.days-warning {
+  background: #fef3c7;
+  border: 1px solid #fde047;
+  color: #b45309;
+}
+
+[data-theme="light"] .days-badge.days-danger {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+}
+
+[data-theme="light"] .remarks-text {
+  color: #475569;
+}
+
+/* Pagination Bar in Light Theme */
+[data-theme="light"] .table-pagination {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+[data-theme="light"] .pagination-text strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .btn-page-nav {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #1e293b;
+}
+
+[data-theme="light"] .btn-page-nav:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+[data-theme="light"] .btn-page-nav:disabled {
+  opacity: 0.4;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .page-indicator {
+  color: #475569;
+}
+
+[data-theme="light"] .table-scroll-wrapper {
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+[data-theme="light"] .table-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+[data-theme="light"] .plant-pills-scroll {
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+[data-theme="light"] .plant-pills-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-theme="light"] .panb-select,
+[data-theme="light"] .plant-search-input,
+[data-theme="light"] .table-search-input {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .panb-select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+[data-theme="light"] .modal-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* ==========================================================================
+   3. THEME: Emerald Forest (Eco / Sustainability Green)
+   ========================================================================== */
+:root[data-theme="emerald"],
+[data-theme="emerald"] {
+  --theme-accent: #10b981;
+  --theme-accent-glow: rgba(16, 185, 129, 0.28);
+  --theme-accent-soft: rgba(16, 185, 129, 0.14);
+
+  --panb-navy-950: #04140d;
+  --panb-navy-900: #071f14;
+  --panb-navy-850: #0b2c1d;
+  --panb-navy-800: #113e29;
+  --panb-navy-700: #1b5238;
+
+  --panb-cyan: #10b981;
+  --panb-cyan-glow: rgba(16, 185, 129, 0.28);
+  --panb-emerald: #10b981;
+  --panb-emerald-glow: rgba(16, 185, 129, 0.25);
+  --panb-amber: #f59e0b;
+  --panb-amber-glow: rgba(245, 158, 11, 0.2);
+  --panb-rose: #f43f5e;
+  --panb-rose-glow: rgba(244, 63, 94, 0.22);
+  --panb-indigo: #059669;
+
+  --panb-surface: rgba(7, 31, 20, 0.78);
+  --panb-surface-card: rgba(11, 44, 29, 0.85);
+  --panb-surface-hover: rgba(17, 62, 41, 0.9);
+  --panb-surface-input: rgba(4, 20, 13, 0.88);
+
+  --panb-border: rgba(16, 185, 129, 0.15);
+  --panb-border-subtle: rgba(16, 185, 129, 0.06);
+  --panb-border-highlight: rgba(16, 185, 129, 0.45);
+
+  --text-white: #f0fdf4;
+  --text-heading: #dcfce7;
+  --text-body: #bbf7d0;
+  --text-dim: #86efac;
+  --text-muted: #4ade80;
+
+  --shadow-card: 0 8px 32px -4px rgba(0, 20, 10, 0.6);
+  --shadow-glow: 0 0 24px rgba(16, 185, 129, 0.28);
+
+  --primary-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  --panb-bg-gradient: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.18), transparent),
+                      radial-gradient(ellipse 60% 40% at 85% 60%, rgba(5, 150, 105, 0.08), transparent);
+  --panb-ambient-gradient: radial-gradient(ellipse at top, rgba(16, 185, 129, 0.14) 0%, transparent 70%);
+
+  /* Home Dashboard Power BI theme */
+  --pbi-canvas-bg: #04120a;
+  --pbi-chrome-bg: #030d07;
+  --pbi-chrome-text: #f0fdf4;
+  --pbi-ribbon-bg: #071a10;
+  --pbi-ribbon-border: rgba(16, 185, 129, 0.15);
+  --pbi-card-bg: #0a2115;
+  --pbi-card-border: rgba(16, 185, 129, 0.16);
+  --pbi-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --pbi-card-hover-border: rgba(16, 185, 129, 0.4);
+  --pbi-text-title: #f0fdf4;
+  --pbi-text-body: #bbf7d0;
+  --pbi-text-muted: #86efac;
+  --pbi-text-dim: #4ade80;
+  --pbi-input-bg: #06170e;
+  --pbi-input-border: rgba(16, 185, 129, 0.22);
+  --pbi-input-text: #f0fdf4;
+  --pbi-table-header-bg: #081e13;
+  --pbi-table-header-text: #86efac;
+  --pbi-table-row-hover: rgba(16, 185, 129, 0.1);
+  --pbi-table-row-border: rgba(16, 185, 129, 0.08);
+  --pbi-accent: #10b981;
+  --pbi-accent-soft: rgba(16, 185, 129, 0.15);
+  --pbi-search-bg: #030d07;
+  --pbi-search-border: rgba(16, 185, 129, 0.2);
+  --pbi-search-text: #f0fdf4;
+}
+
+/* ==========================================================================
+   4. THEME: Royal Cobalt (Power BI Sapphire Blue)
+   ========================================================================== */
+:root[data-theme="cobalt"],
+[data-theme="cobalt"] {
+  --theme-accent: #3b82f6;
+  --theme-accent-glow: rgba(59, 130, 246, 0.28);
+  --theme-accent-soft: rgba(59, 130, 246, 0.14);
+
+  --panb-navy-950: #060e22;
+  --panb-navy-900: #0a1738;
+  --panb-navy-850: #0f2250;
+  --panb-navy-800: #162f6b;
+  --panb-navy-700: #1e3e8a;
+
+  --panb-cyan: #3b82f6;
+  --panb-cyan-glow: rgba(59, 130, 246, 0.28);
+  --panb-emerald: #10b981;
+  --panb-emerald-glow: rgba(16, 185, 129, 0.22);
+  --panb-amber: #f59e0b;
+  --panb-amber-glow: rgba(245, 158, 11, 0.2);
+  --panb-rose: #f43f5e;
+  --panb-rose-glow: rgba(244, 63, 94, 0.22);
+  --panb-indigo: #2563eb;
+
+  --panb-surface: rgba(10, 23, 56, 0.78);
+  --panb-surface-card: rgba(15, 34, 80, 0.85);
+  --panb-surface-hover: rgba(22, 47, 107, 0.9);
+  --panb-surface-input: rgba(6, 14, 34, 0.88);
+
+  --panb-border: rgba(59, 130, 246, 0.15);
+  --panb-border-subtle: rgba(59, 130, 246, 0.06);
+  --panb-border-highlight: rgba(59, 130, 246, 0.45);
+
+  --text-white: #f8fafc;
+  --text-heading: #eff6ff;
+  --text-body: #bfdbfe;
+  --text-dim: #93c5fd;
+  --text-muted: #60a5fa;
+
+  --shadow-card: 0 8px 32px -4px rgba(0, 10, 30, 0.6);
+  --shadow-glow: 0 0 24px rgba(59, 130, 246, 0.28);
+
+  --primary-gradient: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+  --panb-bg-gradient: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.18), transparent),
+                      radial-gradient(ellipse 60% 40% at 85% 60%, rgba(29, 78, 216, 0.08), transparent);
+  --panb-ambient-gradient: radial-gradient(ellipse at top, rgba(59, 130, 246, 0.14) 0%, transparent 70%);
+
+  /* Home Dashboard Power BI theme */
+  --pbi-canvas-bg: #060e22;
+  --pbi-chrome-bg: #040917;
+  --pbi-chrome-text: #f8fafc;
+  --pbi-ribbon-bg: #0a1532;
+  --pbi-ribbon-border: rgba(59, 130, 246, 0.15);
+  --pbi-card-bg: #0e1d44;
+  --pbi-card-border: rgba(59, 130, 246, 0.16);
+  --pbi-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --pbi-card-hover-border: rgba(59, 130, 246, 0.4);
+  --pbi-text-title: #f8fafc;
+  --pbi-text-body: #bfdbfe;
+  --pbi-text-muted: #93c5fd;
+  --pbi-text-dim: #60a5fa;
+  --pbi-input-bg: #07122b;
+  --pbi-input-border: rgba(59, 130, 246, 0.22);
+  --pbi-input-text: #f8fafc;
+  --pbi-table-header-bg: #091739;
+  --pbi-table-header-text: #93c5fd;
+  --pbi-table-row-hover: rgba(59, 130, 246, 0.1);
+  --pbi-table-row-border: rgba(59, 130, 246, 0.08);
+  --pbi-accent: #3b82f6;
+  --pbi-accent-soft: rgba(59, 130, 246, 0.15);
+  --pbi-search-bg: #040917;
+  --pbi-search-border: rgba(59, 130, 246, 0.2);
+  --pbi-search-text: #f8fafc;
+}
+
+/* ==========================================================================
+   5. THEME: Sunset Amber (Warm Executive Bronze & Gold)
+   ========================================================================== */
+:root[data-theme="amber"],
+[data-theme="amber"] {
+  --theme-accent: #f59e0b;
+  --theme-accent-glow: rgba(245, 158, 11, 0.28);
+  --theme-accent-soft: rgba(245, 158, 11, 0.14);
+
+  --panb-navy-950: #120d08;
+  --panb-navy-900: #1c140d;
+  --panb-navy-850: #291d12;
+  --panb-navy-800: #3a2a19;
+  --panb-navy-700: #4e3922;
+
+  --panb-cyan: #f59e0b;
+  --panb-cyan-glow: rgba(245, 158, 11, 0.28);
+  --panb-emerald: #10b981;
+  --panb-emerald-glow: rgba(16, 185, 129, 0.22);
+  --panb-amber: #f59e0b;
+  --panb-amber-glow: rgba(245, 158, 11, 0.25);
+  --panb-rose: #f43f5e;
+  --panb-rose-glow: rgba(244, 63, 94, 0.22);
+  --panb-indigo: #d97706;
+
+  --panb-surface: rgba(28, 20, 13, 0.78);
+  --panb-surface-card: rgba(41, 29, 18, 0.85);
+  --panb-surface-hover: rgba(58, 42, 25, 0.9);
+  --panb-surface-input: rgba(18, 13, 8, 0.88);
+
+  --panb-border: rgba(245, 158, 11, 0.15);
+  --panb-border-subtle: rgba(245, 158, 11, 0.06);
+  --panb-border-highlight: rgba(245, 158, 11, 0.45);
+
+  --text-white: #fffbeb;
+  --text-heading: #fef3c7;
+  --text-body: #fde68a;
+  --text-dim: #fcd34d;
+  --text-muted: #d97706;
+
+  --shadow-card: 0 8px 32px -4px rgba(20, 10, 0, 0.6);
+  --shadow-glow: 0 0 24px rgba(245, 158, 11, 0.28);
+
+  --primary-gradient: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+  --panb-bg-gradient: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245, 158, 11, 0.18), transparent),
+                      radial-gradient(ellipse 60% 40% at 85% 60%, rgba(217, 119, 6, 0.08), transparent);
+  --panb-ambient-gradient: radial-gradient(ellipse at top, rgba(245, 158, 11, 0.14) 0%, transparent 70%);
+
+  /* Home Dashboard Power BI theme */
+  --pbi-canvas-bg: #120e0a;
+  --pbi-chrome-bg: #0d0a07;
+  --pbi-chrome-text: #fffbeb;
+  --pbi-ribbon-bg: #1a140f;
+  --pbi-ribbon-border: rgba(245, 158, 11, 0.15);
+  --pbi-card-bg: #221b14;
+  --pbi-card-border: rgba(245, 158, 11, 0.16);
+  --pbi-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --pbi-card-hover-border: rgba(245, 158, 11, 0.4);
+  --pbi-text-title: #fffbeb;
+  --pbi-text-body: #fde68a;
+  --pbi-text-muted: #fcd34d;
+  --pbi-text-dim: #d97706;
+  --pbi-input-bg: #16110c;
+  --pbi-input-border: rgba(245, 158, 11, 0.22);
+  --pbi-input-text: #fffbeb;
+  --pbi-table-header-bg: #1d1610;
+  --pbi-table-header-text: #fcd34d;
+  --pbi-table-row-hover: rgba(245, 158, 11, 0.1);
+  --pbi-table-row-border: rgba(245, 158, 11, 0.08);
+  --pbi-accent: #f59e0b;
+  --pbi-accent-soft: rgba(245, 158, 11, 0.15);
+  --pbi-search-bg: #0d0a07;
+  --pbi-search-border: rgba(245, 158, 11, 0.2);
+  --pbi-search-text: #fffbeb;
+}
+
+/* ==========================================================================
+   6. THEME: Neon Amethyst (Interstellar Cyber Purple)
+   ========================================================================== */
+:root[data-theme="amethyst"],
+[data-theme="amethyst"] {
+  --theme-accent: #a855f7;
+  --theme-accent-glow: rgba(168, 85, 247, 0.28);
+  --theme-accent-soft: rgba(168, 85, 247, 0.14);
+
+  --panb-navy-950: #0e0919;
+  --panb-navy-900: #150d26;
+  --panb-navy-850: #1e1338;
+  --panb-navy-800: #2c1a4f;
+  --panb-navy-700: #3b2369;
+
+  --panb-cyan: #a855f7;
+  --panb-cyan-glow: rgba(168, 85, 247, 0.28);
+  --panb-emerald: #10b981;
+  --panb-emerald-glow: rgba(16, 185, 129, 0.22);
+  --panb-amber: #f59e0b;
+  --panb-amber-glow: rgba(245, 158, 11, 0.2);
+  --panb-rose: #f43f5e;
+  --panb-rose-glow: rgba(244, 63, 94, 0.22);
+  --panb-indigo: #7c3aed;
+
+  --panb-surface: rgba(21, 13, 38, 0.78);
+  --panb-surface-card: rgba(30, 19, 56, 0.85);
+  --panb-surface-hover: rgba(44, 26, 79, 0.9);
+  --panb-surface-input: rgba(14, 9, 25, 0.88);
+
+  --panb-border: rgba(168, 85, 247, 0.15);
+  --panb-border-subtle: rgba(168, 85, 247, 0.06);
+  --panb-border-highlight: rgba(168, 85, 247, 0.45);
+
+  --text-white: #faf5ff;
+  --text-heading: #f3e8ff;
+  --text-body: #e9d5ff;
+  --text-dim: #d8b4fe;
+  --text-muted: #a855f7;
+
+  --shadow-card: 0 8px 32px -4px rgba(15, 0, 30, 0.6);
+  --shadow-glow: 0 0 24px rgba(168, 85, 247, 0.28);
+
+  --primary-gradient: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  --panb-bg-gradient: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(168, 85, 247, 0.18), transparent),
+                      radial-gradient(ellipse 60% 40% at 85% 60%, rgba(124, 58, 237, 0.08), transparent);
+  --panb-ambient-gradient: radial-gradient(ellipse at top, rgba(168, 85, 247, 0.14) 0%, transparent 70%);
+
+  /* Home Dashboard Power BI theme */
+  --pbi-canvas-bg: #0e0919;
+  --pbi-chrome-bg: #0a0612;
+  --pbi-chrome-text: #faf5ff;
+  --pbi-ribbon-bg: #150d26;
+  --pbi-ribbon-border: rgba(168, 85, 247, 0.15);
+  --pbi-card-bg: #1d1235;
+  --pbi-card-border: rgba(168, 85, 247, 0.16);
+  --pbi-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --pbi-card-hover-border: rgba(168, 85, 247, 0.4);
+  --pbi-text-title: #faf5ff;
+  --pbi-text-body: #e9d5ff;
+  --pbi-text-muted: #d8b4fe;
+  --pbi-text-dim: #a855f7;
+  --pbi-input-bg: #120b21;
+  --pbi-input-border: rgba(168, 85, 247, 0.22);
+  --pbi-input-text: #faf5ff;
+  --pbi-table-header-bg: #180e2d;
+  --pbi-table-header-text: #d8b4fe;
+  --pbi-table-row-hover: rgba(168, 85, 247, 0.1);
+  --pbi-table-row-border: rgba(168, 85, 247, 0.08);
+  --pbi-accent: #a855f7;
+  --pbi-accent-soft: rgba(168, 85, 247, 0.15);
+  --pbi-search-bg: #0a0612;
+  --pbi-search-border: rgba(168, 85, 247, 0.2);
+  --pbi-search-text: #faf5ff;
+}
