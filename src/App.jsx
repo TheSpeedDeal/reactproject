@@ -8,6 +8,7 @@ import {
 import ThemeSelector from './components/ThemeSelector/ThemeSelector';
 import { DEFAULT_THEME, THEME_STORAGE_KEY } from './utils/themeConfig';
 import PermitsMonitoringSystem from './components/Permits & Licenses Monitoring System/PermitsMonitoringSystem';
+import SourceExcel from './components/SourceExcel/SourceExcel';
 import './App.css';
 
 // Enterprise Systems & Roadmap Modules Configuration
@@ -165,6 +166,29 @@ const ENTERPRISE_MODULES = [
 
 // Alias for FUTURE_MODULES so any existing references remain compatible
 const FUTURE_MODULES = ENTERPRISE_MODULES;
+
+// Environment Check: SourceExcel is strictly an internal developer page.
+// On published / production builds (import.meta.env.PROD), it is completely hidden.
+// It is visible only during local development (import.meta.env.DEV)
+// or on published builds when explicitly unlocked by a developer via query `?dev=true` or localStorage.
+const isDevEnvironment = (() => {
+  if (import.meta.env.DEV) return true;
+  try {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('dev') === 'true' || params.get('dev') === '1') {
+        localStorage.setItem('panb_dev_mode', 'true');
+        return true;
+      }
+      if (localStorage.getItem('panb_dev_mode') === 'true') {
+        return true;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+})();
 
 export default function App() {
   // Main Top-Level Navigation: 'hub' (Central Hub) | 'permits' (Permits & Licenses System)
@@ -377,14 +401,8 @@ export default function App() {
     }
   }, [processWorkbookData]);
 
-  // Initial mount load
-  useEffect(() => {
-    loadDefaultFile();
-  }, [loadDefaultFile]);
-
-  // Local file upload handler
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
+  // Reusable local file processor (used by both file picker and SourceExcel dropzone)
+  const handleProcessLocalFile = useCallback((file) => {
     if (!file) return;
     setIsLoading(true);
     setLoadingText(`Reading "${file.name}"...`);
@@ -403,29 +421,75 @@ export default function App() {
     };
 
     reader.readAsArrayBuffer(file);
+  }, [processWorkbookData]);
+
+  // Local file upload handler
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleProcessLocalFile(file);
   };
 
-  // SharePoint URL handler
-  const handleSharePointUrl = useCallback(async () => {
-    const raw = sharePointUrl.trim();
+  // Reusable SharePoint URL fetcher (used by upload modal and SourceExcel page)
+  const fetchSharePointData = useCallback(async (customUrl) => {
+    const raw = (customUrl || sharePointUrl).trim();
     if (!raw) {
-      setUrlLoadError('Please paste a valid SharePoint or OneDrive link.');
-      return;
+      throw new Error('Please paste a valid SharePoint or OneDrive link.');
     }
     setUrlLoading(true);
     setUrlLoadError('');
     try {
       const resp = await fetch(raw);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
       const arrayBuffer = await resp.arrayBuffer();
-      processWorkbookData(arrayBuffer, 'SharePoint Workbook.xlsx', '1.9 MB', 'sharepoint');
+      const sizeStr = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2) + ' MB';
+
+      let derivedName = 'SharePoint Workbook.xlsx';
+      try {
+        const urlObj = new URL(raw);
+        const parts = urlObj.pathname.split('/');
+        const last = parts[parts.length - 1];
+        if (last && (last.endsWith('.xlsx') || last.endsWith('.xls'))) {
+          derivedName = decodeURIComponent(last);
+        }
+      } catch {
+        // fallback
+      }
+
+      processWorkbookData(arrayBuffer, derivedName, sizeStr, 'sharepoint');
       setSharePointUrl('');
       setUrlLoading(false);
+      return { success: true, fileName: derivedName, sizeStr };
     } catch (e) {
       setUrlLoadError(`Could not fetch SharePoint file: ${e.message}`);
       setUrlLoading(false);
+      throw e;
     }
   }, [sharePointUrl, processWorkbookData]);
+
+  const handleSharePointUrl = useCallback(() => {
+    fetchSharePointData().catch(() => {});
+  }, [fetchSharePointData]);
+
+  // Initial mount load (with developer auto-sync check)
+  useEffect(() => {
+    const shouldAutoSync = localStorage.getItem('panb_developer_sp_autosync') === 'true';
+    const savedSpUrl = localStorage.getItem('panb_developer_sharepoint_url');
+    if (shouldAutoSync && savedSpUrl) {
+      fetchSharePointData(savedSpUrl).catch((err) => {
+        console.warn('Developer auto-sync from SharePoint failed, using default master:', err);
+        loadDefaultFile();
+      });
+    } else {
+      loadDefaultFile();
+    }
+  }, [loadDefaultFile, fetchSharePointData]);
+
+  // Ensure SourceExcel view is never active when not in dev environment
+  useEffect(() => {
+    if (!isDevEnvironment && activeMainModule === 'sourceExcel') {
+      setActiveMainModule('hub');
+    }
+  }, [activeMainModule]);
 
   // Launch into Permits & Licenses Monitoring System
   const launchPermitsSystem = (view = 'home') => {
@@ -467,27 +531,43 @@ export default function App() {
           title="Return to Central Operations Hub"
         >
           <div className="brand-logo-icon">
-            {activeMainModule === 'hub' ? '🏢' : (currentActiveModule?.icon || '📜')}
+            {activeMainModule === 'hub'
+              ? '🏢'
+              : (isDevEnvironment && activeMainModule === 'sourceExcel')
+              ? '🛠️'
+              : (currentActiveModule?.icon || '📜')}
           </div>
           <div className="brand-titles">
             <div className="brand-badge-row">
               <span className="badge-org">PANB ENTERPRISE</span>
               <span className="badge-year">
-                {activeMainModule === 'hub' ? '2026 Operations Portal' : (currentActiveModule?.name || 'Monitoring System')}
+                {activeMainModule === 'hub'
+                  ? '2026 Operations Portal'
+                  : (isDevEnvironment && activeMainModule === 'sourceExcel')
+                  ? 'Developer Console'
+                  : (currentActiveModule?.name || 'Monitoring System')}
               </span>
               <span className="badge-live-pulse">
                 <span className="live-dot"></span>
-                {activeMainModule === 'hub' ? 'Central Hub Live' : (currentActiveModule?.status || 'Active System')}
+                {activeMainModule === 'hub'
+                  ? 'Central Hub Live'
+                  : (isDevEnvironment && activeMainModule === 'sourceExcel')
+                  ? 'Dev Pipeline Active'
+                  : (currentActiveModule?.status || 'Active System')}
               </span>
             </div>
             <h1 className="brand-main-title">
               {activeMainModule === 'hub'
                 ? 'Operations & Regulatory Compliance Portal'
+                : (isDevEnvironment && activeMainModule === 'sourceExcel')
+                ? 'SourceExcel • Developer Data Pipeline'
                 : (currentActiveModule?.name || 'Operations Portal')}
             </h1>
             <p className="brand-sub-title">
               {activeMainModule === 'hub'
                 ? 'Central intelligence hub • 23 industrial operating facilities • Enterprise regulatory monitoring'
+                : (isDevEnvironment && activeMainModule === 'sourceExcel')
+                ? 'Developer console • Configure default master Excel workbook & live SharePoint synchronization'
                 : `Comprehensive regulatory monitoring for ${targetSheets.length || 23} operating facilities`}
             </p>
           </div>
@@ -528,6 +608,18 @@ export default function App() {
             </button>
           )}
 
+          {isDevEnvironment && (
+            <button
+              type="button"
+              className={`btn-header-dev ${activeMainModule === 'sourceExcel' ? 'active' : ''}`}
+              onClick={() => setActiveMainModule(activeMainModule === 'sourceExcel' ? 'hub' : 'sourceExcel')}
+              title="Developer Console: Configure Default Excel & SharePoint Sources"
+            >
+              <span>🛠️</span>
+              <span>SourceExcel</span>
+            </button>
+          )}
+
           <ThemeSelector
             currentTheme={currentTheme}
             onSelectTheme={handleThemeChange}
@@ -558,6 +650,16 @@ export default function App() {
               </div>
 
               <div className="hub-scroll-controls">
+                {isDevEnvironment && (
+                  <button
+                    type="button"
+                    className="btn-hub-dev-pill"
+                    onClick={() => setActiveMainModule('sourceExcel')}
+                    title="Open SourceExcel Developer Console"
+                  >
+                    🛠️ Dev: SourceExcel
+                  </button>
+                )}
                 <span className="hub-scroll-hint">
                   <span className="hub-scroll-icon">↔</span> Drag or Scroll Left / Right
                 </span>
@@ -685,6 +787,27 @@ export default function App() {
           onSyncData={loadDefaultFile}
           onUploadFile={() => setShowUploadModal(true)}
         />
+      )}
+
+      {/* 3. Main View 3: SourceExcel (Developer Data Source Console - Visible only in Dev / Unlocked) */}
+      {isDevEnvironment && activeMainModule === 'sourceExcel' && (
+        <main className="source-excel-main-wrapper">
+          <SourceExcel
+            fileName={fileName}
+            fileSize={fileSize}
+            sourceType={sourceType}
+            targetSheets={targetSheets}
+            plantRegions={plantRegions}
+            parsedDataCache={parsedDataCache}
+            isLoading={isLoading}
+            onReloadDefault={loadDefaultFile}
+            onProcessFile={handleProcessLocalFile}
+            onFetchSharePoint={fetchSharePointData}
+            onNavigateHome={() => setActiveMainModule('hub')}
+            onLaunchPermits={() => launchPermitsSystem('home')}
+            currentTheme={currentTheme}
+          />
+        </main>
       )}
 
       {/* 4. Future Feature Scope Modal */}
