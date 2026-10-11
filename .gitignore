@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Sensitive Local Application Configuration & Company Credentials
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+.env.local
+.env.*.local

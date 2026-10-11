@@ -167,37 +167,128 @@ const ENTERPRISE_MODULES = [
 // Alias for FUTURE_MODULES so any existing references remain compatible
 const FUTURE_MODULES = ENTERPRISE_MODULES;
 
-// Environment Check: SourceExcel is strictly an internal developer page.
-// On published / production builds (import.meta.env.PROD), it is completely hidden.
-// It is visible only during local development (import.meta.env.DEV)
-// or on published builds when explicitly unlocked by a developer via query `?dev=true` or localStorage.
-const isDevEnvironment = (() => {
-  if (import.meta.env.DEV) return true;
-  try {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('dev') === 'true' || params.get('dev') === '1') {
-        localStorage.setItem('panb_dev_mode', 'true');
-        return true;
+// Default initial datasets per module
+const INITIAL_MODULE_DATASETS = {
+  permits: {
+    activeFileId: 'default-permits',
+    files: [
+      {
+        id: 'default-permits',
+        name: 'PANB Permits & Licenses Monitoring 2026 v3.xlsx',
+        sizeStr: '1.95 MB',
+        origin: 'default',
+        targetSheets: ['BMP-BATAAN', 'BMP-TARLAC', 'BMP-ISABELA', 'MPH-PAL', 'MPPP-PAG', 'MPF-TOLEDO'],
+        plantRegions: DEFAULT_REGIONS,
+        parsedDataCache: {},
+        totalRecords: 1450,
+        uploadedAt: 'Baseline Master',
+        status: 'Ready in Cache'
       }
-      if (localStorage.getItem('panb_dev_mode') === 'true') {
-        return true;
+    ]
+  },
+  ccr: {
+    activeFileId: 'default-ccr',
+    files: [
+      {
+        id: 'default-ccr',
+        name: 'PANB CCR Generation & Disposal Master 2026.xlsx',
+        sizeStr: '0.85 MB',
+        origin: 'default',
+        targetSheets: ['CCR-BATAAN', 'CCR-TARLAC', 'CCR-ISABELA', 'ASH-DISPOSAL-LOGS'],
+        totalRecords: 480,
+        uploadedAt: 'Baseline Schema',
+        status: 'Ready in Cache'
       }
-    }
-  } catch {
-    // ignore
+    ]
+  },
+  energy: {
+    activeFileId: 'default-energy',
+    files: [
+      {
+        id: 'default-energy',
+        name: 'PANB Energy Conservation & Heat Rate Monitoring 2026.xlsx',
+        sizeStr: '1.12 MB',
+        origin: 'default',
+        targetSheets: ['ENERGY-GRID-SYNC', 'HEAT-RATE-ANALYSIS', 'DOE-RA11285-METRICS'],
+        totalRecords: 620,
+        uploadedAt: 'Baseline Schema',
+        status: 'Ready in Cache'
+      }
+    ]
+  },
+  nov: {
+    activeFileId: 'default-nov',
+    files: [
+      {
+        id: 'default-nov',
+        name: 'PANB Notice of Violation & CAPA Master 2026.xlsx',
+        sizeStr: '0.45 MB',
+        origin: 'default',
+        targetSheets: ['NOV-DOCKET', 'TECH-CONFERENCE-LOG', 'CAPA-RESOLUTIONS'],
+        totalRecords: 145,
+        uploadedAt: 'Baseline Schema',
+        status: 'Ready in Cache'
+      }
+    ]
+  },
+  solid_waste: {
+    activeFileId: 'default-solid_waste',
+    files: [
+      {
+        id: 'default-solid_waste',
+        name: 'PANB Solid Waste Management & Segregation 2026.xlsx',
+        sizeStr: '0.72 MB',
+        origin: 'default',
+        targetSheets: ['MRF-DIVERSION-RATES', 'HAULER-MANIFESTS', 'SCRAP-INVENTORY'],
+        totalRecords: 390,
+        uploadedAt: 'Baseline Schema',
+        status: 'Ready in Cache'
+      }
+    ]
+  },
+  tree_planting: {
+    activeFileId: 'default-tree_planting',
+    files: [
+      {
+        id: 'default-tree_planting',
+        name: 'PANB NGP Tree Planting & Estero Clean-Up 2026.xlsx',
+        sizeStr: '0.98 MB',
+        origin: 'default',
+        targetSheets: ['PLANTING-INVENTORY', 'SURVIVAL-RATE-AUDIT', 'CLEANUP-TONNAGE'],
+        totalRecords: 510,
+        uploadedAt: 'Baseline Schema',
+        status: 'Ready in Cache'
+      }
+    ]
+  },
+  water: {
+    activeFileId: 'default-water',
+    files: [
+      {
+        id: 'default-water',
+        name: 'PANB Clean Water Act Effluent & Abstraction 2026.xlsx',
+        sizeStr: '1.30 MB',
+        origin: 'default',
+        targetSheets: ['WWTP-LAB-ANALYSIS', 'EFFLUENT-DISCHARGE', 'DEEPWELL-ABSTRACTION'],
+        totalRecords: 890,
+        uploadedAt: 'Baseline Schema',
+        status: 'Ready in Cache'
+      }
+    ]
   }
-  return false;
-})();
+};
 
 export default function App() {
-  // Main Top-Level Navigation: 'hub' (Central Hub) | 'permits' (Permits & Licenses System)
+  // Main Top-Level Navigation: 'hub' (Central Hub) | 'permits' (Permits & Licenses System) | 'sourceExcel' (Data Sources)
   const [activeMainModule, setActiveMainModule] = useState('hub');
   const [permitsView, setPermitsView] = useState('home'); // 'home' | 'tables'
   const [targetPlant, setTargetPlant] = useState('');
   const [targetSearch, setTargetSearch] = useState('');
 
-  // Workbook & Sheets State
+  // Module-by-Module Master Datasets State
+  const [moduleDatasets, setModuleDatasets] = useState(INITIAL_MODULE_DATASETS);
+
+  // Active Permits Workbook & Sheets State
   const [_workbook, setWorkbook] = useState(null);
   const [targetSheets, setTargetSheets] = useState([]);
   const [activeSheetName, setActiveSheetName] = useState('');
@@ -235,10 +326,21 @@ export default function App() {
   const [loadingText, setLoadingText] = useState('Initializing PANB Central Enterprise Hub...');
   const [errorMessage, setErrorMessage] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadModalTab, setUploadModalTab] = useState('file');
-  const [sharePointUrl, setSharePointUrl] = useState('');
-  const [urlLoadError, setUrlLoadError] = useState('');
-  const [urlLoading, setUrlLoading] = useState(false);
+  const [appSettings, setAppSettings] = useState(null);
+
+  // Load appsettings.json on initialization for environment configuration
+  useEffect(() => {
+    fetch('/api/appsettings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setAppSettings(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load /api/appsettings:', err);
+      });
+  }, []);
 
   // Future feature preview modal
   const [previewModule, setPreviewModule] = useState(null);
@@ -359,6 +461,8 @@ export default function App() {
         cache[sName] = parsePlantWorksheet(wb.Sheets[sName], sName);
       });
 
+      const totalRecs = Object.values(cache).reduce((sum, s) => sum + (Array.isArray(s) ? s.length : 0), 0);
+
       setWorkbook(wb);
       setTargetSheets(matchingSheets);
       setPlantRegions(extractedRegions);
@@ -369,6 +473,40 @@ export default function App() {
       setActiveSheetName(matchingSheets[0]);
       setShowUploadModal(false);
       setIsLoading(false);
+
+      // Record active file in moduleDatasets for permits
+      const fileId = source === 'default' ? 'default-permits' : `file-${Date.now()}`;
+      const fileRecord = {
+        id: fileId,
+        name,
+        sizeStr,
+        origin: source,
+        targetSheets: matchingSheets,
+        plantRegions: extractedRegions,
+        parsedDataCache: cache,
+        totalRecords: totalRecs,
+        uploadedAt: source === 'default' ? 'Baseline Master' : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'Ready in Cache',
+        workbook: wb
+      };
+
+      setModuleDatasets((prev) => {
+        const existing = prev.permits?.files || [];
+        const isDefault = source === 'default';
+        let updatedFiles;
+        if (isDefault) {
+          updatedFiles = [fileRecord, ...existing.filter((f) => f.id !== 'default-permits')];
+        } else {
+          updatedFiles = [fileRecord, ...existing.filter((f) => f.id !== fileId)];
+        }
+        return {
+          ...prev,
+          permits: {
+            activeFileId: fileId,
+            files: updatedFiles
+          }
+        };
+      });
     } catch (err) {
       console.error('Workbook parsing error:', err);
       setErrorMessage(`Failed to process spreadsheet: ${err.message}`);
@@ -429,67 +567,98 @@ export default function App() {
     if (file) handleProcessLocalFile(file);
   };
 
-  // Reusable SharePoint URL fetcher (used by upload modal and SourceExcel page)
-  const fetchSharePointData = useCallback(async (customUrl) => {
-    const raw = (customUrl || sharePointUrl).trim();
-    if (!raw) {
-      throw new Error('Please paste a valid SharePoint or OneDrive link.');
-    }
-    setUrlLoading(true);
-    setUrlLoadError('');
-    try {
-      const resp = await fetch(raw);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
-      const arrayBuffer = await resp.arrayBuffer();
-      const sizeStr = (arrayBuffer.byteLength / 1024 / 1024).toFixed(2) + ' MB';
+  // Switch active spreadsheet for any module
+  const handleSwitchModuleFile = useCallback((moduleId, fileId) => {
+    setModuleDatasets((prev) => {
+      const mod = prev[moduleId];
+      if (!mod) return prev;
+      const targetFile = mod.files?.find((f) => f.id === fileId);
+      if (!targetFile) return prev;
 
-      let derivedName = 'SharePoint Workbook.xlsx';
-      try {
-        const urlObj = new URL(raw);
-        const parts = urlObj.pathname.split('/');
-        const last = parts[parts.length - 1];
-        if (last && (last.endsWith('.xlsx') || last.endsWith('.xls'))) {
-          derivedName = decodeURIComponent(last);
+      if (moduleId === 'permits') {
+        setFileName(targetFile.name);
+        setFileSize(targetFile.sizeStr);
+        setSourceType(targetFile.origin);
+        if (targetFile.targetSheets && targetFile.targetSheets.length > 0) {
+          setTargetSheets(targetFile.targetSheets);
+          setActiveSheetName(targetFile.targetSheets[0]);
         }
-      } catch {
-        // fallback
+        if (targetFile.plantRegions) setPlantRegions(targetFile.plantRegions);
+        if (targetFile.parsedDataCache) setParsedDataCache(targetFile.parsedDataCache);
+        if (targetFile.workbook) setWorkbook(targetFile.workbook);
       }
 
-      processWorkbookData(arrayBuffer, derivedName, sizeStr, 'sharepoint');
-      setSharePointUrl('');
-      setUrlLoading(false);
-      return { success: true, fileName: derivedName, sizeStr };
-    } catch (e) {
-      setUrlLoadError(`Could not fetch SharePoint file: ${e.message}`);
-      setUrlLoading(false);
-      throw e;
+      return {
+        ...prev,
+        [moduleId]: {
+          ...mod,
+          activeFileId: fileId
+        }
+      };
+    });
+  }, []);
+
+  // Upload an Excel file for any module
+  const handleUploadModuleFile = useCallback(async (moduleId, file) => {
+    if (!file) return;
+    if (moduleId === 'permits') {
+      handleProcessLocalFile(file);
+      return;
     }
-  }, [sharePointUrl, processWorkbookData]);
 
-  const handleSharePointUrl = useCallback(() => {
-    fetchSharePointData().catch(() => {});
-  }, [fetchSharePointData]);
-
-  // Initial mount load (with developer auto-sync check)
-  useEffect(() => {
-    const shouldAutoSync = localStorage.getItem('panb_developer_sp_autosync') === 'true';
-    const savedSpUrl = localStorage.getItem('panb_developer_sharepoint_url');
-    if (shouldAutoSync && savedSpUrl) {
-      fetchSharePointData(savedSpUrl).catch((err) => {
-        console.warn('Developer auto-sync from SharePoint failed, using default master:', err);
-        loadDefaultFile();
+    setIsLoading(true);
+    setLoadingText(`Reading "${file.name}" for ${moduleId}...`);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const wb = XLSX.read(arrayBuffer, { type: 'array' });
+      const sheetNames = wb.SheetNames || [];
+      let totalRows = 0;
+      sheetNames.forEach((s) => {
+        const sheet = wb.Sheets[s];
+        if (sheet) {
+          const rows = XLSX.utils.sheet_to_json(sheet);
+          totalRows += rows.length;
+        }
       });
-    } else {
-      loadDefaultFile();
-    }
-  }, [loadDefaultFile, fetchSharePointData]);
 
-  // Ensure SourceExcel view is never active when not in dev environment
-  useEffect(() => {
-    if (!isDevEnvironment && activeMainModule === 'sourceExcel') {
-      setActiveMainModule('hub');
+      const fileId = `file-${Date.now()}`;
+      const sizeStr = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+      const fileRecord = {
+        id: fileId,
+        name: file.name,
+        sizeStr,
+        origin: 'local',
+        targetSheets: sheetNames,
+        plantRegions: {},
+        parsedDataCache: {},
+        totalRecords: totalRows,
+        uploadedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'Ready in Cache',
+        workbook: wb
+      };
+
+      setModuleDatasets((prev) => {
+        const existing = prev[moduleId]?.files || [];
+        return {
+          ...prev,
+          [moduleId]: {
+            activeFileId: fileId,
+            files: [fileRecord, ...existing]
+          }
+        };
+      });
+      setIsLoading(false);
+    } catch (err) {
+      console.error('Error parsing module file:', err);
+      setErrorMessage(`Failed to parse file for ${moduleId}: ${err.message}`);
+      setIsLoading(false);
     }
-  }, [activeMainModule]);
+  }, [handleProcessLocalFile]);
+
+  // Initial mount load
+  useEffect(() => {
+    loadDefaultFile();
+  }, [loadDefaultFile]);
 
   // Launch into Permits & Licenses Monitoring System
   const launchPermitsSystem = (view = 'home') => {
@@ -533,8 +702,8 @@ export default function App() {
           <div className="brand-logo-icon">
             {activeMainModule === 'hub'
               ? '🏢'
-              : (isDevEnvironment && activeMainModule === 'sourceExcel')
-              ? '🛠️'
+              : activeMainModule === 'sourceExcel'
+              ? '📊'
               : (currentActiveModule?.icon || '📜')}
           </div>
           <div className="brand-titles">
@@ -543,31 +712,31 @@ export default function App() {
               <span className="badge-year">
                 {activeMainModule === 'hub'
                   ? '2026 Operations Portal'
-                  : (isDevEnvironment && activeMainModule === 'sourceExcel')
-                  ? 'Developer Console'
+                  : activeMainModule === 'sourceExcel'
+                  ? 'Master Data Sources'
                   : (currentActiveModule?.name || 'Monitoring System')}
               </span>
               <span className="badge-live-pulse">
                 <span className="live-dot"></span>
                 {activeMainModule === 'hub'
                   ? 'Central Hub Live'
-                  : (isDevEnvironment && activeMainModule === 'sourceExcel')
-                  ? 'Dev Pipeline Active'
+                  : activeMainModule === 'sourceExcel'
+                  ? 'Data Pipeline Active'
                   : (currentActiveModule?.status || 'Active System')}
               </span>
             </div>
             <h1 className="brand-main-title">
               {activeMainModule === 'hub'
                 ? 'Operations & Regulatory Compliance Portal'
-                : (isDevEnvironment && activeMainModule === 'sourceExcel')
-                ? 'SourceExcel • Developer Data Pipeline'
+                : activeMainModule === 'sourceExcel'
+                ? 'SourceExcel • Module Master Spreadsheets'
                 : (currentActiveModule?.name || 'Operations Portal')}
             </h1>
             <p className="brand-sub-title">
               {activeMainModule === 'hub'
                 ? 'Central intelligence hub • 23 industrial operating facilities • Enterprise regulatory monitoring'
-                : (isDevEnvironment && activeMainModule === 'sourceExcel')
-                ? 'Developer console • Configure default master Excel workbook & live SharePoint synchronization'
+                : activeMainModule === 'sourceExcel'
+                ? 'Configure master Excel workbooks • Upload sheets per module • Switch active workbooks'
                 : `Comprehensive regulatory monitoring for ${targetSheets.length || 23} operating facilities`}
             </p>
           </div>
@@ -608,17 +777,15 @@ export default function App() {
             </button>
           )}
 
-          {isDevEnvironment && (
-            <button
-              type="button"
-              className={`btn-header-dev ${activeMainModule === 'sourceExcel' ? 'active' : ''}`}
-              onClick={() => setActiveMainModule(activeMainModule === 'sourceExcel' ? 'hub' : 'sourceExcel')}
-              title="Developer Console: Configure Default Excel & SharePoint Sources"
-            >
-              <span>🛠️</span>
-              <span>SourceExcel</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className={`btn-header-dev ${activeMainModule === 'sourceExcel' ? 'active' : ''}`}
+            onClick={() => setActiveMainModule(activeMainModule === 'sourceExcel' ? 'hub' : 'sourceExcel')}
+            title="Manage Module Master Excel Spreadsheets"
+          >
+            <span>📊</span>
+            <span>SourceExcel</span>
+          </button>
 
           <ThemeSelector
             currentTheme={currentTheme}
@@ -650,16 +817,6 @@ export default function App() {
               </div>
 
               <div className="hub-scroll-controls">
-                {isDevEnvironment && (
-                  <button
-                    type="button"
-                    className="btn-hub-dev-pill"
-                    onClick={() => setActiveMainModule('sourceExcel')}
-                    title="Open SourceExcel Developer Console"
-                  >
-                    🛠️ Dev: SourceExcel
-                  </button>
-                )}
                 <span className="hub-scroll-hint">
                   <span className="hub-scroll-icon">↔</span> Drag or Scroll Left / Right
                 </span>
@@ -789,20 +946,15 @@ export default function App() {
         />
       )}
 
-      {/* 3. Main View 3: SourceExcel (Developer Data Source Console - Visible only in Dev / Unlocked) */}
-      {isDevEnvironment && activeMainModule === 'sourceExcel' && (
+      {/* 3. Main View 3: SourceExcel (Master Data Spreadsheets per Module) */}
+      {activeMainModule === 'sourceExcel' && (
         <main className="source-excel-main-wrapper">
           <SourceExcel
-            fileName={fileName}
-            fileSize={fileSize}
-            sourceType={sourceType}
-            targetSheets={targetSheets}
-            plantRegions={plantRegions}
-            parsedDataCache={parsedDataCache}
-            isLoading={isLoading}
+            modules={ENTERPRISE_MODULES}
+            moduleDatasets={moduleDatasets}
+            onSwitchModuleFile={handleSwitchModuleFile}
+            onUploadModuleFile={handleUploadModuleFile}
             onReloadDefault={loadDefaultFile}
-            onProcessFile={handleProcessLocalFile}
-            onFetchSharePoint={fetchSharePointData}
             onNavigateHome={() => setActiveMainModule('hub')}
             onLaunchPermits={() => launchPermitsSystem('home')}
             currentTheme={currentTheme}
@@ -885,7 +1037,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 5. Upload File / SharePoint Modal */}
+      {/* 5. Upload File Modal */}
       {showUploadModal && (
         <div className="modal-overlay" onClick={() => setShowUploadModal(false)}>
           <div
@@ -897,7 +1049,7 @@ export default function App() {
             <div className="modal-header">
               <div className="modal-title-group">
                 <h3>Upload Plant Monitoring Spreadsheet</h3>
-                <p>Upload a new Excel workbook or paste a SharePoint / OneDrive link.</p>
+                <p>Upload a local Excel master workbook (.xlsx, .xls) to update the compliance cache.</p>
               </div>
               <button
                 type="button"
@@ -909,77 +1061,27 @@ export default function App() {
             </div>
 
             <div className="modal-body">
-              <div className="modal-tabs">
-                <button
-                  type="button"
-                  className={`modal-tab-btn ${uploadModalTab === 'file' ? 'active' : ''}`}
-                  onClick={() => setUploadModalTab('file')}
-                >
-                  📁 Local File (.xlsx)
+              <div
+                className="modal-dropzone"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <div className="dropzone-icon">📊</div>
+                <h4>Select or Drag &amp; Drop Spreadsheet</h4>
+                <p>Upload an updated workbook containing plant monitoring sheets.</p>
+                <button type="button" className="btn-browse-file">
+                  Browse From Computer
                 </button>
-                <button
-                  type="button"
-                  className={`modal-tab-btn ${uploadModalTab === 'url' ? 'active' : ''}`}
-                  onClick={() => setUploadModalTab('url')}
-                >
-                  🔗 SharePoint / OneDrive
-                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    handleFileUpload(e);
+                    setShowUploadModal(false);
+                  }}
+                  accept=".xlsx, .xls"
+                  style={{ display: 'none' }}
+                />
               </div>
-
-              {uploadModalTab === 'file' && (
-                <div
-                  className="modal-dropzone"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="dropzone-icon">📊</div>
-                  <h4>Select or Drag &amp; Drop Spreadsheet</h4>
-                  <p>Upload updated workbook with plant monitoring sheets.</p>
-                  <button type="button" className="btn-browse-file">
-                    Browse From Computer
-                  </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    accept=".xlsx, .xls"
-                    style={{ display: 'none' }}
-                  />
-                </div>
-              )}
-
-              {uploadModalTab === 'url' && (
-                <div className="url-upload-panel">
-                  <div className="url-input-row">
-                    <input
-                      type="url"
-                      className="url-text-input"
-                      placeholder="https://yourorg.sharepoint.com/:x:/s/…"
-                      value={sharePointUrl}
-                      onChange={(e) => {
-                        setSharePointUrl(e.target.value);
-                        setUrlLoadError('');
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSharePointUrl();
-                      }}
-                      disabled={urlLoading}
-                    />
-                    <button
-                      type="button"
-                      className="btn-load-url"
-                      onClick={handleSharePointUrl}
-                      disabled={urlLoading || !sharePointUrl.trim()}
-                    >
-                      {urlLoading ? '⏳ Loading…' : 'Load'}
-                    </button>
-                  </div>
-                  {urlLoadError && (
-                    <div className="url-error-msg" style={{ color: '#fb7185', fontSize: '0.82rem', marginTop: '0.5rem' }}>
-                      ⚠️ {urlLoadError}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             <div className="modal-footer">

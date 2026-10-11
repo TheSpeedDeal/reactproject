@@ -1,103 +1,239 @@
-# PANB Permits & Licenses Monitoring 2026
+# PANB Enterprise Operations & Regulatory Compliance Portal (2026)
 
-A React + Vite dashboard for tracking regulatory permits, licenses, and reportorial requirements across PANB plant facilities.
+A high-performance, modular React + Vite enterprise web portal for operational compliance tracking, regulatory permit monitoring, and automated data ingestion across 23 industrial operating facilities.
 
 ---
 
-## Getting Started
+## 📑 Table of Contents
 
-```bash
-npm install
-npm run dev
+- [Overview & Architecture](#overview--architecture)
+- [Quick Start](#quick-start)
+- [Core Application Modules](#core-application-modules)
+  - [1. Central Operations Hub](#1-central-operations-hub)
+  - [2. Permits & Licenses Monitoring System](#2-permits--licenses-monitoring-system)
+  - [3. SourceExcel (Developer Data Source Console)](#3-sourceexcel-developer-data-source-console)
+- [Data Ingestion & Pipeline](#data-ingestion--pipeline)
+  - [Bundled Master Excel Workbook](#bundled-master-excel-workbook)
+  - [Local File Upload](#local-file-upload)
+  - [Facility Sheet Parsing Rules](#facility-sheet-parsing-rules)
+- [Theme System](#theme-system)
+- [Global Navigation & Access](#global-navigation--access)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+
+---
+
+## Overview & Architecture
+
+The portal serves as the unified intelligence hub for executive management, compliance officers, and plant engineers. It is designed around modular enterprise features, multi-theme aesthetics, and robust spreadsheet data pipelines.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Global Central Enterprise Header                     │
+│  [🏢 Logo & Dynamic Titles]  [View Tabs]  [🛠️ Dev Tool]  [🟡 Theme]   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
+┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│   Central Hub    │      │ Permits System   │      │   SourceExcel    │
+│  (Landing Page)  │      │ (Active Module)  │      │  (Dev Pipeline)  │
+├──────────────────┤      ├──────────────────┤      ├──────────────────┤
+│ • Modular Track  │      │ • Executive Dash │      │ • Master Excel   │
+│ • Drag-to-Scroll │      │ • Display Tables │      │ • Working File   │
+│ • Roadmap Scopes │      │ • Slicer Filters │      │ • Raw Inspector  │
+└──────────────────┘      └──────────────────┘      └──────────────────┘
 ```
 
-The app runs at `http://localhost:5173` by default.
+---
+
+## Quick Start
+
+### Prerequisites
+- Node.js (v18 or higher recommended)
+- npm (v9 or higher)
+
+### Setup & Run
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start Vite local development server
+npm run dev
+
+# 3. Build optimized production bundle
+npm run build
+
+# 4. Preview production build locally
+npm run preview
+```
+
+The application runs locally at `http://localhost:5173/`.
 
 ---
 
-## Loading Data
+## Core Application Modules
 
-The application supports two ways to load the monitoring workbook:
+### 1. Central Operations Hub
+The landing page of the application that showcases active and upcoming modular systems:
+- **Left-to-Right Horizontal Scrolling Track**: All feature modules are displayed in a clean, non-wrapping horizontal track to ensure **zero vertical page scrolling**.
+- **Multi-Input Navigation**:
+  - **Mouse Left-Click Drag**: Click and drag with your left mouse button to smoothly swipe the track left and right (with built-in accidental click suppression).
+  - **Mouse Wheel**: Vertical wheel movement over the track translates directly into horizontal scrolling.
+  - **Navigation Controls**: One-click arrow buttons (`‹` and `›`) in the section header.
+  - **Glow Scrollbar**: Touch-friendly, theme-accented horizontal scrollbar.
+- **Architectural Roadmap Scopes**: Click on upcoming roadmap modules (e.g., CCR Generation, Energy Monitoring, Notice of Violation, Solid Waste, Tree Planting, Water Monitoring) to open modal previews of planned capabilities and compliance annexes.
 
-### 1. Upload File (Local)
+### 2. Permits & Licenses Monitoring System
+The live operational module tracking clearances and deadlines across all 23 plant facilities:
+- **Executive Compliance Dashboard**:
+  - Power BI-style summary metrics (Total Tracked Permits, Valid Clearances, Renewal In-Progress, Expired Counts).
+  - 12-Month Interactive Expiration Timeline Chart (Recharts).
+  - Regulatory Distribution Donut Chart (ECC, CNC, PTO, DP, LLDA, DOLE, BFP, etc.).
+  - Slicer filters for Facility Type, Region, Expiration Status, and Plant Search.
+  - Urgent Action Required matrix highlighting near-expiration items (<60 days).
+  - **Data Controls**: "Sync Data" and "Upload File" buttons integrated directly within the dashboard.
+- **Facility Display Tables**:
+  - Full display table per facility, segregated into **Permits & Licenses** and **Reportorial PMR/SMR Requirements**.
+  - Multi-column sort, search, and pagination.
+  - Direct CSV Export for report submission.
 
-Click **Upload / Update** in the header, then select an `.xlsx` or `.xls` workbook from your computer using the file picker or drag-and-drop.
+### 3. SourceExcel (Module Master Spreadsheets Console)
+A dedicated console to manage, upload, and switch master Excel spreadsheets individually across all enterprise compliance modules:
+- **Per-Module Metrics Bar**: Displays real-time pipeline status for each module with 6 key indicators:
+  - `ACTIVE MASTER FILE`: Name of the currently active workbook
+  - `DATA ORIGIN`: `Default Master Asset` vs `Local Custom Upload`
+  - `PAYLOAD SIZE`: Active spreadsheet size
+  - `TARGET PLANT SHEETS`: Operational facility worksheet counts
+  - `COMPLIANCE RECORDS`: Total extracted records
+  - `PIPELINE STATUS`: Real-time cache readiness status (`● Ready in Cache`)
+- **Multiple Uploads & Active File Switcher**: Upload multiple workbooks per module (drag-and-drop or file picker) and switch which spreadsheet is active on the fly.
+- **Global Header Access**: Conveniently accessible to all users directly from the top header navigation (`📊 SourceExcel`).
 
-### 2. SharePoint / OneDrive URL
+---
 
-You can load the workbook directly from a SharePoint or OneDrive share link without downloading it first.
+## Data Ingestion & Pipeline
 
-#### How to use
+### Bundled Master Excel Workbook
+When launched, the portal automatically loads and parses the default production master workbook located in:
+```
+public/PANB_Permits_Licenses_Monitoring_2026_v3.xlsx
+```
 
-1. Click **Upload / Update** in the header.
-2. Switch to the **🔗 SharePoint URL** tab.
-3. Paste your SharePoint or OneDrive sharing link.
-4. Click **Load** (or press **Enter**).
+### Local File Upload & Security Posture
+Users and developers can upload any updated `.xlsx`, `.xls`, or `.xlsm` workbook via the dashboard or the SourceExcel console.
+- **Client-Side In-Memory Processing**: The parser processes spreadsheets entirely in browser memory using SheetJS (`xlsx`). No file contents, corporate credentials, or employee tokens are ever transmitted to external servers.
+- **Enterprise Security Policy**: Remote network fetching/uploading of corporate Microsoft 365 / SharePoint links was intentionally removed to avoid security risks, eliminate exposure of personal corporate authentication sessions, and strictly comply with enterprise SSO/MFA data isolation policies.
+- **Workflow**: Authorized plant engineers open their compliance workbook in their authenticated corporate browser session, export or save a copy, and drag & drop the file directly into the portal.
 
-#### Supported link domains
+### Configuration (`appsettings.json`)
+Local environment preferences can be set in `appsettings.json`:
+```json
+{
+  "Environment": {
+    "defaultExcelPath": "/PANB_Permits_Licenses_Monitoring_2026_v3.xlsx",
+    "enableDeveloperMode": true
+  }
+}
+```
+`appsettings.json` is added to `.gitignore` to prevent committing local environment overrides. An `appsettings.example.json` template is maintained in version control.
 
-| Domain | Example |
-|---|---|
-| `sharepoint.com` | `https://yourorg.sharepoint.com/:x:/s/…` |
-| `onedrive.live.com` | `https://onedrive.live.com/…` |
-| `1drv.ms` | `https://1drv.ms/x/s!…` |
+### Facility Sheet Parsing Rules
+The parser scans all worksheet tabs in the workbook and filters by valid facility prefixes:
 
-#### ⚠️ SharePoint Sharing Requirement
-
-> **The file must be shared as "Anyone with the link can view".**
-
-This is required because the app fetches the file directly from the browser. If the file is restricted to org members or requires a login, the browser cannot authenticate on your behalf and the fetch will fail.
-
-**Steps to set up the correct sharing permission in SharePoint:**
-
-1. Open the file in SharePoint Online.
-2. Click **Share** (top-right) → **Copy Link**.
-3. In the link settings panel, change the access from *"People in [Org]"* to **"Anyone with the link"**.
-4. Set permission to **Can view** (read-only is sufficient).
-5. Click **Apply**, then **Copy** the generated link.
-6. Paste that link into the SharePoint URL tab of this app.
-
-**Common error messages and what they mean:**
-
-| Error | Cause | Fix |
+| Prefix | Facility Classification | Example Sheets |
 |---|---|---|
-| `"Received an HTML login page instead of the file"` | Link is still org-restricted | Change sharing to "Anyone with the link" |
-| `"SharePoint returned HTTP 403"` | Link requires authentication | Adjust sharing settings as above |
-| `"URL must be from sharepoint.com…"` | Non-SharePoint URL was pasted | Use a link from a supported domain |
+| `BMP` | Biomass Power Plant | `BMP-BATAAN`, `BMP-TARLAC`, `BMP-ISABELA` |
+| `MPH` | Mini-Hydro Power Plant | `MPH-PAL`, `MPH-PAN`, `MPH-BAKUN` |
+| `MPPP` | Mini-Pump Power Plant | `MPPP-PAG`, `MPPP-CALIRAYA` |
+| `MPF` | Mini-Power Facility | `MPF-TOLEDO`, `MPF-MAJAYJAY` |
 
-> **Note:** The file is fetched in read-only mode. No data is written back to SharePoint.
-
----
-
-## Workbook Sheet Filter Rule
-
-The app automatically scans all sheets in the uploaded workbook and includes only those matching these **prefixes**:
-
-| Prefix | Facility Type |
-|---|---|
-| `BMP` | Biomass Power Plant |
-| `MPH` | Mini-Hydro Power Plant |
-| `MPPP` | Mini-Pump Power Plant |
-| `MPF` | Mini-Power Facility |
-
-Sheets not matching these prefixes (e.g. `SUMMARY-Permits`, `Legend`) are ignored for the compliance tables but may be used for region mapping.
+> Sheets like `SUMMARY-Permits` are used to extract regional assignments (e.g., Luzon, Visayas, Mindanao). Non-matching sheets (e.g., `Legend`, notes) are excluded from compliance display tables.
 
 ---
 
-## Features
+## Theme System
 
-- **Home Dashboard** — Power BI-style KPI cards, timeline chart, donut chart, and urgent action table. All visuals update live from the loaded Excel data.
-- **Table View** — Paginated, filterable, and sortable compliance tables for Permits & Licenses and Reportorial Requirements per plant.
-- **Plant Selector** — Filter by facility type, region, and search by name.
-- **Export to CSV** — Download the current filtered table as a CSV file.
-- **SharePoint URL Ingestion** — Load the workbook directly from a SharePoint or OneDrive share link.
+The portal includes 6 curated, accessible themes designed with bespoke color tokens, smooth CSS transitions, and glassmorphic card framing:
+
+| # | Theme Name | Identifier | Aesthetic Description |
+|---|---|---|---|
+| 1 | **Midnight Slate** | `midnight` | *(Default)* Cyber Dark Navy with cyan and emerald accents |
+| 2 | **Clean Enterprise** | `light` | Crisp, luminous executive light mode with slate borders |
+| 3 | **Emerald Forest** | `emerald` | Sustainability & environmental green palette |
+| 4 | **Royal Cobalt** | `cobalt` | Deep corporate sapphire blue inspired by Power BI |
+| 5 | **Sunset Amber** | `sunset` | Warm gold & obsidian executive dashboard palette |
+| 6 | **Neon Amethyst** | `neon` | Cosmic cyber dark with violet and magenta glowing accents |
+
+Themes can be switched using the dropdown in the top header and persist across page reloads via `localStorage`.
+
+---
+
+## Global Navigation & Access
+
+All portal modules and administrative tools are accessible directly from the top global enterprise header:
+- **Central Operations Hub**: Click the PANB Enterprise logo or "← Back to Central Hub" button to return to the landing overview.
+- **Permits & Licenses System**: Executive dashboard and facility display tables for operational compliance tracking.
+- **SourceExcel Console**: Click the `📊 SourceExcel` button located **exclusively in the top header** to view active workbooks, upload new sheets, and switch datasets per module. Available to all users across development and production environments.
+
+---
+
+## Project Structure
+
+The project strictly follows a modular folder convention with isolated JSX and CSS components and direct imports:
+
+```
+reactproject/
+├── public/
+│   └── PANB_Permits_Licenses_Monitoring_2026_v3.xlsx   # Bundled baseline Excel
+├── src/
+│   ├── assets/                                         # Static images & branding
+│   ├── components/
+│   │   ├── Permits & Licenses Monitoring System/
+│   │   │   ├── DisplayTables/
+│   │   │   │   ├── DisplayTables.jsx
+│   │   │   │   └── DisplayTables.css
+│   │   │   ├── HomeDashboard/
+│   │   │   │   ├── HomeDashboard.jsx
+│   │   │   │   └── HomeDashboard.css
+│   │   │   └── PermitsMonitoringSystem.jsx            # Permits module wrapper
+│   │   ├── SourceExcel/
+│   │   │   ├── SourceExcel.jsx                         # Dev console component
+│   │   │   └── SourceExcel.css                         # Dev console styles
+│   │   └── ThemeSelector/
+│   │       ├── ThemeSelector.jsx                       # Theme picker dropdown
+│   │       └── ThemeSelector.css
+│   ├── utils/
+│   │   ├── ExcelParsers/
+│   │   │   └── excelParserPermitAndLicense.js          # Permits SheetJS parser
+│   │   └── themeConfig.js                              # Theme definitions & keys
+│   ├── App.jsx                                         # Core router & Central Hub
+│   ├── App.css                                         # Layout & Central Hub CSS
+│   ├── themes.css                                      # 6-theme color definitions
+│   ├── index.css                                       # Global base reset
+│   └── main.jsx                                        # Application entry point
+├── .gitignore                                          # Ignores appsettings.json & local overrides
+├── appsettings.example.json                            # Git-tracked configuration template
+├── appsettings.json                                    # Local environment preferences (gitignored)
+├── package.json
+├── vite.config.js                                      # Dev server & appsettings loader
+└── README.md
+```
 
 ---
 
 ## Tech Stack
 
-- [React 18](https://react.dev/)
-- [Vite](https://vitejs.dev/)
-- [SheetJS (xlsx)](https://sheetjs.com/) — Excel parsing
-- [Recharts](https://recharts.org/) — Dashboard charts
-- [Oxlint](https://oxc.rs/) — Linting
+- **Framework**: [React 18](https://react.dev/)
+- **Bundler & Dev Server**: [Vite 8](https://vitejs.dev/)
+- **Spreadsheet Parsing**: [SheetJS (xlsx)](https://sheetjs.com/)
+- **Data Visualizations**: [Recharts](https://recharts.org/)
+- **Styling**: Vanilla CSS (CSS Variables, Flexbox, CSS Grid, Glassmorphism)
+- **Linting & Code Quality**: [Oxlint](https://oxc.rs/)
+
+---
+
+## License
+
+Internal corporate portal developed for PANB Enterprise Operations. All rights reserved.
