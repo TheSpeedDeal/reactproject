@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import HomeDashboard from './HomeDashboard/HomeDashboard';
+import SummaryTables from './SummaryTables/SummaryTables';
 import DisplayTables from './DisplayTables/DisplayTables';
 
 export default function PermitsMonitoringSystem({
   parsedDataCache = {},
+  summaryData = { permitsSummary: null, reportorialSummary: null },
   targetSheets = [],
   plantRegions = {},
   isLoading = false,
@@ -15,6 +17,7 @@ export default function PermitsMonitoringSystem({
   subTab: controlledSubTab,
   onNavigateToTable: parentNavigateToTable,
   onNavigateHome: parentNavigateHome,
+  onNavigateSummary: parentNavigateSummary,
   targetPlant: controlledTargetPlant,
   setTargetPlant: controlledSetTargetPlant,
   targetSearch: controlledTargetSearch,
@@ -64,6 +67,17 @@ export default function PermitsMonitoringSystem({
           onSelectTheme={onSelectTheme}
           onSyncData={onSyncData}
           onUploadFile={onUploadFile}
+        />
+      )}
+
+      {subTab === 'summary' && (
+        <SummaryTables
+          summaryData={summaryData}
+          fileName={fileName}
+          fileSize={fileSize}
+          sourceType={sourceType}
+          onNavigateToTable={handleNavigateToTable}
+          onNavigateHome={handleNavigateHome}
         />
       )}
 

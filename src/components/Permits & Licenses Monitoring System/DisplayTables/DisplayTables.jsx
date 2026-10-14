@@ -16,7 +16,7 @@ export default function DisplayTables({
   fileSize = '',
   sourceType = 'default',
   initialSearch = '',
-  onNavigateHome
+  onNavigateHome: _onNavigateHome
 }) {
   // Active sheet state
   const [internalActiveSheetName, setInternalActiveSheetName] = useState(() => {
@@ -31,8 +31,8 @@ export default function DisplayTables({
   const [regionFilter, setRegionFilter] = useState('ALL');
   const [plantSearchTerm, setPlantSearchTerm] = useState('');
 
-  // View Mode: 'both' | 'permits' | 'reportorial'
-  const [viewMode, setViewMode] = useState('both');
+  // View Mode: 'permits' | 'reportorial'
+  const [viewMode, setViewMode] = useState('permits');
 
   // Table 1 (Permits & Licenses) Controls State
   const [permitsSearch, setPermitsSearch] = useState(initialSearch || '');
@@ -374,55 +374,23 @@ export default function DisplayTables({
 
   return (
     <div className="display-tables-wrapper" aria-label="Facility Compliance Tables">
-      {/* 1. Plant Selector & Multi-Level Filter Bar */}
-      <section className="plant-selector-card">
-        <div className="selector-top-row">
-          {/* Facility Type Filter Tabs */}
-          <div className="filter-pill-group">
-            <span className="filter-group-label">Facility Type:</span>
-            <button
-              type="button"
-              className={`filter-pill ${facilityTypeFilter === 'ALL' ? 'active' : ''}`}
-              onClick={() => setFacilityTypeFilter('ALL')}
-            >
-              All ({targetSheets.length})
-            </button>
-            {Object.values(FACILITY_TYPES).map((fac) => {
-              const count = targetSheets.filter((s) => s.startsWith(fac.code)).length;
-              if (count === 0) return null;
-              return (
-                <button
-                  type="button"
-                  key={fac.code}
-                  className={`filter-pill ${facilityTypeFilter === fac.code ? 'active' : ''}`}
-                  onClick={() => setFacilityTypeFilter(fac.code)}
-                >
-                  <span className="pill-icon">{fac.icon}</span>
-                  {fac.code} ({count})
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Region Filter Dropdown & Search */}
-          <div className="selector-right-controls">
-            <div className="select-control-box">
-              <label htmlFor="regionSelect">Region:</label>
-              <select
-                id="regionSelect"
-                value={regionFilter}
-                onChange={(e) => setRegionFilter(e.target.value)}
-                className="panb-select"
-              >
-                <option value="ALL">All Regions (4)</option>
-                <option value="North Luzon">North Luzon</option>
-                <option value="South Luzon">South Luzon</option>
-                <option value="Visayas">Visayas</option>
-                <option value="Mindanao">Mindanao</option>
-              </select>
+      <div className="display-tables-layout">
+        {/* LEFT SIDEBAR: Plant Selector & Multi-Level Filter Panel (2nd Pic) */}
+        <aside className="tables-sidebar" aria-label="Facilities Sidebar">
+          <section className="plant-selector-card">
+            {/* Sidebar Top Header */}
+            <div className="sidebar-header-row">
+              <div className="sidebar-header-title">
+                <span className="sidebar-title-icon">🏭</span>
+                <span className="sidebar-title-text">Operating Plants</span>
+              </div>
+              <span className="sidebar-count-badge">
+                {filteredPlantSheets.length} / {targetSheets.length}
+              </span>
             </div>
 
-            <div className="plant-search-box">
+            {/* Plant Search Box */}
+            <div className="plant-search-box sidebar-search">
               <span className="search-symbol">🔍</span>
               <input
                 type="text"
@@ -436,150 +404,181 @@ export default function DisplayTables({
                   type="button"
                   className="clear-btn-sm"
                   onClick={() => setPlantSearchTerm('')}
+                  title="Clear search"
                 >
                   ✕
                 </button>
               )}
             </div>
 
-            {onNavigateHome && (
+            {/* Region Filter Dropdown */}
+            <div className="sidebar-filter-item">
+              <label htmlFor="regionSelect" className="sidebar-filter-label">Region:</label>
+              <select
+                id="regionSelect"
+                value={regionFilter}
+                onChange={(e) => setRegionFilter(e.target.value)}
+                className="panb-select sidebar-select"
+              >
+                <option value="ALL">All Regions (4)</option>
+                <option value="North Luzon">North Luzon</option>
+                <option value="South Luzon">South Luzon</option>
+                <option value="Visayas">Visayas</option>
+                <option value="Mindanao">Mindanao</option>
+              </select>
+            </div>
+
+            {/* Facility Type Filter Tabs */}
+            <div className="sidebar-facility-filter">
+              <span className="sidebar-filter-label">Facility Type:</span>
+              <div className="filter-pill-group sidebar-pills">
+                <button
+                  type="button"
+                  className={`filter-pill ${facilityTypeFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setFacilityTypeFilter('ALL')}
+                >
+                  All ({targetSheets.length})
+                </button>
+                {Object.values(FACILITY_TYPES).map((fac) => {
+                  const count = targetSheets.filter((s) => s.startsWith(fac.code)).length;
+                  if (count === 0) return null;
+                  return (
+                    <button
+                      type="button"
+                      key={fac.code}
+                      className={`filter-pill ${facilityTypeFilter === fac.code ? 'active' : ''}`}
+                      onClick={() => setFacilityTypeFilter(fac.code)}
+                      title={`${fac.label} (${count})`}
+                    >
+                      <span className="pill-icon">{fac.icon}</span>
+                      {fac.code} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Vertical Scrollable Operating Plants List */}
+            <div className="plant-list-container">
+              <div className="plant-list-header">
+                <span className="plants-list-label">Facilities List:</span>
+                <span className="plant-list-count">{filteredPlantSheets.length} matching</span>
+              </div>
+              <div className="plant-pills-scroll sidebar-scroll">
+                {filteredPlantSheets.length === 0 ? (
+                  <div className="no-plants-match">No plants match selected filters.</div>
+                ) : (
+                  filteredPlantSheets.map((sheetName) => {
+                    const isCur = activeSheetName === sheetName;
+                    const fac = getFacilityType(sheetName);
+                    return (
+                      <button
+                        type="button"
+                        key={sheetName}
+                        className={`plant-pill-btn sidebar-plant-item ${isCur ? 'active' : ''}`}
+                        onClick={() => {
+                          setActiveSheetName(sheetName);
+                          resetTableControls();
+                        }}
+                      >
+                        <div className="plant-item-left">
+                          <span className="pill-fac-icon">{fac.icon}</span>
+                          <span className="pill-name">{sheetName}</span>
+                        </div>
+                        {isCur && <span className="plant-active-indicator" title="Selected Plant">●</span>}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        {/* RIGHT MAIN CONTENT AREA: Hero Header, Tabs & Tables */}
+        <main className="tables-main-content">
+          {/* 2. Active Plant Hero Header & KPI Banner */}
+          <section className="active-plant-hero">
+            <div className="hero-left-info">
+              <div className="hero-tags">
+                <span
+                  className="hero-tag-badge facility-tag"
+                  style={{ borderColor: activeFacility.color }}
+                >
+                  {activeFacility.icon} {activeFacility.label} ({activeFacility.code})
+                </span>
+                <span className="hero-tag-badge region-tag">
+                  📍 {activeRegion}
+                </span>
+                <span
+                  className="hero-tag-badge file-source-tag"
+                  title={`${fileName} ${fileSize ? `(${fileSize})` : ''} • ${sourceType === 'default' ? 'Default Dataset' : 'Custom Upload'}`}
+                >
+                  📁 {fileName} {fileSize ? `(${fileSize})` : ''} • {sourceType === 'default' ? 'Default Dataset' : 'Custom Upload'}
+                </span>
+              </div>
+              <h2 className="hero-plant-name">{activeSheetName || 'No Plant Selected'}</h2>
+              <p className="hero-plant-desc">
+                Displaying 2 Compliance Tables: <strong>Permit and Licenses</strong> ({currentSheetData.permits.length} items) &amp; <strong>Reportorial Requirements</strong> ({currentSheetData.reportorial.length} items)
+              </p>
+            </div>
+
+            {/* KPI Metric Cards */}
+            <div className="hero-kpi-grid">
+              <div className="kpi-card kpi-success">
+                <div className="kpi-val">{metrics.activePermits}</div>
+                <div className="kpi-label">Active Permits</div>
+                <div className="kpi-sub">Valid compliance</div>
+              </div>
+
+              <div className="kpi-card kpi-warning">
+                <div className="kpi-val">{metrics.expiringSoonPermits}</div>
+                <div className="kpi-label">Expiring Soon</div>
+                <div className="kpi-sub">&le; 60 days left</div>
+              </div>
+
+              <div className="kpi-card kpi-danger">
+                <div className="kpi-val">{metrics.expiredPermits + metrics.noPermitCount}</div>
+                <div className="kpi-label">Expired / Missing</div>
+                <div className="kpi-sub">Immediate action</div>
+              </div>
+
+              <div className="kpi-card kpi-info">
+                <div className="kpi-val">{metrics.onTimeReports}</div>
+                <div className="kpi-label">Reports On-Time</div>
+                <div className="kpi-sub">Out of {metrics.totalReports}</div>
+              </div>
+
+              <div className="kpi-card kpi-accent">
+                <div className="kpi-val">{metrics.complianceRate}%</div>
+                <div className="kpi-label">Compliance Rate</div>
+                <div className="kpi-sub">Facility health</div>
+              </div>
+            </div>
+          </section>
+
+          {/* 3. View Mode Tabs (Table 1 / Table 2) */}
+          <div className="view-mode-tabs-bar">
+            <div className="tabs-button-group">
               <button
                 type="button"
-                className="btn-export-csv"
-                onClick={onNavigateHome}
-                title="Return to Executive Home Dashboard"
+                className={`tab-view-btn ${viewMode === 'permits' ? 'active' : ''}`}
+                onClick={() => setViewMode('permits')}
               >
-                🏠 Executive View
+                📜 Table 1: Permit and Licenses ({currentSheetData.permits.length})
               </button>
-            )}
-          </div>
-        </div>
-
-        {/* Scrollable Plant Sheet Pills */}
-        <div className="plant-pills-row">
-          <span className="plants-list-label">Operating Plants:</span>
-          <div className="plant-pills-scroll">
-            {filteredPlantSheets.length === 0 ? (
-              <span className="no-plants-match">No plants match selected filters.</span>
-            ) : (
-              filteredPlantSheets.map((sheetName) => {
-                const isCur = activeSheetName === sheetName;
-                const fac = getFacilityType(sheetName);
-                return (
-                  <button
-                    type="button"
-                    key={sheetName}
-                    className={`plant-pill-btn ${isCur ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveSheetName(sheetName);
-                      resetTableControls();
-                    }}
-                  >
-                    <span className="pill-fac-icon">{fac.icon}</span>
-                    <span className="pill-name">{sheetName}</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* 2. Active Plant Hero Header & KPI Banner */}
-      <section className="active-plant-hero">
-        <div className="hero-left-info">
-          <div className="hero-tags">
-            <span
-              className="hero-tag-badge facility-tag"
-              style={{ borderColor: activeFacility.color }}
-            >
-              {activeFacility.icon} {activeFacility.label} ({activeFacility.code})
-            </span>
-            <span className="hero-tag-badge region-tag">
-              📍 {activeRegion}
-            </span>
-            <span className="hero-tag-badge file-source-tag">
-              📁 {fileName} {fileSize ? `(${fileSize})` : ''} • {sourceType === 'default' ? 'Default Dataset' : 'Custom Upload'}
-            </span>
-          </div>
-          <h2 className="hero-plant-name">{activeSheetName || 'No Plant Selected'}</h2>
-          <p className="hero-plant-desc">
-            Displaying 2 Compliance Tables: <strong>Permit and Licenses</strong> ({currentSheetData.permits.length} items) &amp; <strong>Reportorial Requirements</strong> ({currentSheetData.reportorial.length} items)
-          </p>
-        </div>
-
-        {/* KPI Metric Cards */}
-        <div className="hero-kpi-grid">
-          <div className="kpi-card kpi-success">
-            <div className="kpi-val">{metrics.activePermits}</div>
-            <div className="kpi-label">Active Permits</div>
-            <div className="kpi-sub">Valid compliance</div>
+              <button
+                type="button"
+                className={`tab-view-btn ${viewMode === 'reportorial' ? 'active' : ''}`}
+                onClick={() => setViewMode('reportorial')}
+              >
+                📋 Table 2: Reportorial Requirements ({currentSheetData.reportorial.length})
+              </button>
+            </div>
           </div>
 
-          <div className="kpi-card kpi-warning">
-            <div className="kpi-val">{metrics.expiringSoonPermits}</div>
-            <div className="kpi-label">Expiring Soon</div>
-            <div className="kpi-sub">&le; 60 days left</div>
-          </div>
-
-          <div className="kpi-card kpi-danger">
-            <div className="kpi-val">{metrics.expiredPermits + metrics.noPermitCount}</div>
-            <div className="kpi-label">Expired / Missing</div>
-            <div className="kpi-sub">Immediate action</div>
-          </div>
-
-          <div className="kpi-card kpi-info">
-            <div className="kpi-val">{metrics.onTimeReports}</div>
-            <div className="kpi-label">Reports On-Time</div>
-            <div className="kpi-sub">Out of {metrics.totalReports}</div>
-          </div>
-
-          <div className="kpi-card kpi-accent">
-            <div className="kpi-val">{metrics.complianceRate}%</div>
-            <div className="kpi-label">Compliance Rate</div>
-            <div className="kpi-sub">Facility health</div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. View Mode Tabs (Both / Table 1 / Table 2) */}
-      <div className="view-mode-tabs-bar">
-        <div className="tabs-button-group">
-          <button
-            type="button"
-            className={`tab-view-btn ${viewMode === 'both' ? 'active' : ''}`}
-            onClick={() => setViewMode('both')}
-          >
-            📑 Both Tables (Stacked View)
-          </button>
-          <button
-            type="button"
-            className={`tab-view-btn ${viewMode === 'permits' ? 'active' : ''}`}
-            onClick={() => setViewMode('permits')}
-          >
-            📜 Table 1: Permit and Licenses ({currentSheetData.permits.length})
-          </button>
-          <button
-            type="button"
-            className={`tab-view-btn ${viewMode === 'reportorial' ? 'active' : ''}`}
-            onClick={() => setViewMode('reportorial')}
-          >
-            📋 Table 2: Reportorial Requirements ({currentSheetData.reportorial.length})
-          </button>
-        </div>
-
-        <div className="jump-links">
-          {viewMode === 'both' && (
-            <>
-              <a href="#table-permits" className="jump-link">↓ Jump to Permits</a>
-              <a href="#table-reportorial" className="jump-link">↓ Jump to Reportorial</a>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* 4. TABLE 1: PERMITS AND LICENSES */}
-      {(viewMode === 'both' || viewMode === 'permits') && (
+          {/* 4. TABLE 1: PERMITS AND LICENSES */}
+          {viewMode === 'permits' && (
         <section id="table-permits" className="compliance-table-section">
           <div className="section-title-bar">
             <div className="title-with-badge">
@@ -720,12 +719,12 @@ export default function DisplayTables({
               </div>
             ) : (
               <div className="table-scroll-wrapper">
-                <table className="compliance-table">
+                <table className="compliance-table permits-table">
                   <thead>
                     <tr>
                       <th className="th-num">#</th>
                       <th
-                        className="sortable-th"
+                        className="sortable-th th-agency"
                         onClick={() => handlePermitsSort('regulatoryBody')}
                         title="Sort by Regulatory Body"
                       >
@@ -737,7 +736,7 @@ export default function DisplayTables({
                         </div>
                       </th>
                       <th
-                        className="sortable-th"
+                        className="sortable-th th-desc"
                         onClick={() => handlePermitsSort('description')}
                         title="Sort by Description"
                       >
@@ -878,7 +877,7 @@ export default function DisplayTables({
       )}
 
       {/* 5. TABLE 2: REPORTORIAL REQUIREMENTS */}
-      {(viewMode === 'both' || viewMode === 'reportorial') && (
+      {viewMode === 'reportorial' && (
         <section id="table-reportorial" className="compliance-table-section">
           <div className="section-title-bar">
             <div className="title-with-badge">
@@ -1020,12 +1019,12 @@ export default function DisplayTables({
               </div>
             ) : (
               <div className="table-scroll-wrapper">
-                <table className="compliance-table">
+                <table className="compliance-table reportorial-table">
                   <thead>
                     <tr>
                       <th className="th-num">#</th>
                       <th
-                        className="sortable-th"
+                        className="sortable-th th-agency"
                         onClick={() => handleReportSort('regulatoryBody')}
                         title="Sort by Regulatory Body"
                       >
@@ -1037,7 +1036,7 @@ export default function DisplayTables({
                         </div>
                       </th>
                       <th
-                        className="sortable-th"
+                        className="sortable-th th-desc"
                         onClick={() => handleReportSort('description')}
                         title="Sort by Report Description"
                       >
@@ -1168,6 +1167,8 @@ export default function DisplayTables({
           </div>
         </section>
       )}
+        </main>
+      </div>
     </div>
   );
 }

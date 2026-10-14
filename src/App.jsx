@@ -3,7 +3,8 @@ import * as XLSX from 'xlsx';
 import {
   DEFAULT_REGIONS,
   isTargetSheet,
-  parsePlantWorksheet
+  parsePlantWorksheet,
+  parseSummarySheets
 } from './utils/ExcelParsers/excelParserPermitAndLicense';
 import ThemeSelector from './components/ThemeSelector/ThemeSelector';
 import { DEFAULT_THEME, THEME_STORAGE_KEY } from './utils/themeConfig';
@@ -293,6 +294,7 @@ export default function App() {
   const [targetSheets, setTargetSheets] = useState([]);
   const [activeSheetName, setActiveSheetName] = useState('');
   const [parsedDataCache, setParsedDataCache] = useState({});
+  const [summaryData, setSummaryData] = useState({ permitsSummary: null, reportorialSummary: null });
   const [plantRegions, setPlantRegions] = useState(DEFAULT_REGIONS);
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState('');
@@ -461,12 +463,15 @@ export default function App() {
         cache[sName] = parsePlantWorksheet(wb.Sheets[sName], sName);
       });
 
+      const parsedSummary = parseSummarySheets(wb);
+
       const totalRecs = Object.values(cache).reduce((sum, s) => sum + (Array.isArray(s) ? s.length : 0), 0);
 
       setWorkbook(wb);
       setTargetSheets(matchingSheets);
       setPlantRegions(extractedRegions);
       setParsedDataCache(cache);
+      setSummaryData(parsedSummary);
       setFileName(name);
       setFileSize(sizeStr);
       setSourceType(source);
@@ -484,6 +489,7 @@ export default function App() {
         targetSheets: matchingSheets,
         plantRegions: extractedRegions,
         parsedDataCache: cache,
+        summaryData: parsedSummary,
         totalRecords: totalRecs,
         uploadedAt: source === 'default' ? 'Baseline Master' : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         status: 'Ready in Cache',
@@ -585,6 +591,7 @@ export default function App() {
         }
         if (targetFile.plantRegions) setPlantRegions(targetFile.plantRegions);
         if (targetFile.parsedDataCache) setParsedDataCache(targetFile.parsedDataCache);
+        if (targetFile.summaryData) setSummaryData(targetFile.summaryData);
         if (targetFile.workbook) setWorkbook(targetFile.workbook);
       }
 
@@ -679,6 +686,11 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleNavigateSummary = () => {
+    setPermitsView('summary');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleNavigateTables = () => {
     setPermitsView('tables');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -752,6 +764,14 @@ export default function App() {
               title="Executive Compliance Dashboard"
             >
               <span>🏠 Executive Dashboard</span>
+            </button>
+            <button
+              type="button"
+              className={`header-tab-btn ${permitsView === 'summary' ? 'active' : ''}`}
+              onClick={handleNavigateSummary}
+              title="Cross-Facility Compliance Summary Matrix"
+            >
+              <span>📊 Compliance Summary</span>
             </button>
             <button
               type="button"
@@ -927,6 +947,7 @@ export default function App() {
       {activeMainModule === 'permits' && (
         <PermitsMonitoringSystem
           parsedDataCache={parsedDataCache}
+          summaryData={summaryData}
           targetSheets={targetSheets}
           plantRegions={plantRegions}
           isLoading={isLoading}
@@ -938,6 +959,7 @@ export default function App() {
           subTab={permitsView}
           onNavigateToTable={handleNavigateToTable}
           onNavigateHome={handleNavigateHome}
+          onNavigateSummary={handleNavigateSummary}
           targetPlant={targetPlant}
           setTargetPlant={setTargetPlant}
           targetSearch={targetSearch}

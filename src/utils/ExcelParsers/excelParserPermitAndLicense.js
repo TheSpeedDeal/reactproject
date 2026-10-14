@@ -262,3 +262,225 @@ export function exportTableToCsv(filename, headers, rows) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Extract Regulatory Agency from Permit or Report description
+ */
+export function extractAgency(name) {
+  if (!name) return 'Other';
+  const clean = name.trim().toUpperCase();
+  const prefixes = [
+    'DENR', 'DOLE', 'DLE', 'LGU', 'BFP', 'BAI', 'NWRB',
+    'DOE', 'ERC', 'FDA', 'NMIS', 'HACCP', 'PNP', 'PDEA'
+  ];
+  for (const p of prefixes) {
+    if (clean.startsWith(p)) {
+      return p === 'DLE' ? 'DOLE' : p;
+    }
+  }
+  return 'Other';
+}
+
+/**
+ * Parse an individual Summary Worksheet (SUMMARY-Permits or SUMMARY-Reportorial)
+ */
+export function parseSingleSummarySheet(ws, type = 'permits', sheetName = '') {
+  if (!ws) return null;
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  let headerIdx = -1;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i] || [];
+    if (
+      r[0] && String(r[0]).trim().toLowerCase() === 'region' &&
+      r[1] && String(r[1]).trim().toLowerCase() === 'plant'
+    ) {
+      headerIdx = i;
+      break;
+    }
+  }
+
+  if (headerIdx === -1) return null;
+  const headerRow = rows[headerIdx];
+
+  let totalColIdx = -1;
+  let activeColIdx = -1;
+  let pctColIdx = -1;
+
+  for (let c = headerRow.length - 1; c >= 2; c--) {
+    const txt = String(headerRow[c] || '').toLowerCase();
+    if (txt.includes('%') && pctColIdx === -1) {
+      pctColIdx = c;
+    } else if ((txt.includes('active') || txt.includes('updated')) && activeColIdx === -1) {
+      activeColIdx = c;
+    } else if (txt.includes('total') && totalColIdx === -1) {
+      totalColIdx = c;
+    }
+  }
+
+  const itemsEndCol = totalColIdx > -1 ? totalColIdx : headerRow.length;
+  const items = [];
+  for (let c = 2; c < itemsEndCol; c++) {
+    const name = String(headerRow[c] || '').trim();
+    if (name && !name.toLowerCase().startsWith('column')) {
+      items.push({
+        id: `item-${c}`,
+        colIndex: c,
+        name,
+        agency: extractAgency(name)
+      });
+    }
+  }
+
+  const plants = [];
+  for (let r = headerIdx + 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || !row[0] || !row[1]) continue;
+    const region = String(row[0]).trim();
+    const plant = String(row[1]).trim();
+    if (!['North Luzon', 'South Luzon', 'Visayas', 'Mindanao'].includes(region)) continue;
+
+    const values = {};
+    let compCount = 0;
+    let nonCompCount = 0;
+    let naCount = 0;
+
+    items.forEach(item => {
+      const rawCell = String(row[item.colIndex] || '').trim();
+      const cellVal = rawCell.toLowerCase();
+      let status = 'na';
+
+      if (cellVal === '✓' || cellVal === 'v' || cellVal === '1' || cellVal === 'yes' || cellVal === 'active') {
+        status = 'compliant';
+        compCount++;
+      } else if (cellVal === 'x' || cellVal === '0' || cellVal === 'no' || cellVal === 'inactive') {
+        status = 'non-compliant';
+        nonCompCount++;
+      } else {
+        naCount++;
+      }
+
+      values[item.name] = {
+        status,
+        raw: rawCell
+      };
+    });
+
+    const totalApp = totalColIdx > -1 && row[totalColIdx] !== '' && !isNaN(Number(row[totalColIdx]))
+      ? Number(row[totalColIdx])
+      : compCount + nonCompCount;
+
+    const activeVal = activeColIdx > -1 && row[activeColIdx] !== '' && !isNaN(Number(row[activeColIdx]))
+      ? Number(row[activeColIdx])
+      : compCount;
+
+    const pctVal = pctColIdx > -1 && row[pctColIdx] !== '' && !isNaN(Number(row[pctColIdx]))
+      ? Number(row[pctColIdx])
+      : (totalApp > 0 ? activeVal / totalApp : 0);
+
+    plants.push({
+      id: `plant-sum-${plant.replace(/\s+/g, '-')}`,
+      region,
+      plant,
+      facilityType: getFacilityType(plant),
+      values,
+      totalApplicable: totalApp,
+      activeCount: activeVal,
+      nonCompliantCount: totalApp - activeVal,
+      complianceRate: Math.round(pctVal * 100),
+      rawPct: pctVal
+    });
+  }
+
+  // Column level stats across plants
+  const itemStats = items.map(item => {
+    let app = 0;
+    let comp = 0;
+    let nonComp = 0;
+    let na = 0;
+
+    plants.forEach(p => {
+      const cell = p.values[item.name];
+      if (cell?.status === 'compliant') {
+        comp++;
+        app++;
+      } else if (cell?.status === 'non-compliant') {
+        nonComp++;
+        app++;
+      } else {
+        na++;
+      }
+    });
+
+    return {
+      ...item,
+      applicableCount: app,
+      compliantCount: comp,
+      nonCompliantCount: nonComp,
+      naCount: na,
+      complianceRate: app > 0 ? Math.round((comp / app) * 100) : 100
+    };
+  });
+
+  // Region stats
+  const regionStats = {};
+  ['North Luzon', 'South Luzon', 'Visayas', 'Mindanao'].forEach(reg => {
+    const regPlants = plants.filter(p => p.region === reg);
+    const regTotalApp = regPlants.reduce((s, p) => s + p.totalApplicable, 0);
+    const regActive = regPlants.reduce((s, p) => s + p.activeCount, 0);
+    regionStats[reg] = {
+      plantCount: regPlants.length,
+      totalApplicable: regTotalApp,
+      activeCount: regActive,
+      complianceRate: regTotalApp > 0 ? Math.round((regActive / regTotalApp) * 100) : 0
+    };
+  });
+
+  const totalApp = plants.reduce((s, p) => s + p.totalApplicable, 0);
+  const totalActive = plants.reduce((s, p) => s + p.activeCount, 0);
+
+  return {
+    type,
+    sheetName: sheetName || (type === 'permits' ? 'SUMMARY-Permits' : 'SUMMARY-Reportorial'),
+    items,
+    itemStats,
+    plants,
+    totalPlants: plants.length,
+    itemCount: items.length,
+    totalApplicable: totalApp,
+    totalActive,
+    totalDeficient: totalApp - totalActive,
+    overallComplianceRate: totalApp > 0 ? Math.round((totalActive / totalApp) * 100) : 0,
+    regionStats
+  };
+}
+
+/**
+ * Parse SUMMARY-Permits and SUMMARY-Reportorial sheets from workbook
+ */
+export function parseSummarySheets(wb) {
+  if (!wb || !wb.Sheets || !wb.SheetNames) {
+    return { permitsSummary: null, reportorialSummary: null };
+  }
+
+  // Find sheet names with flexible case-insensitivity
+  const permitsSheetName = wb.SheetNames.find((s) => {
+    const l = s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return l.includes('summary') && l.includes('permit');
+  });
+
+  const reportorialSheetName = wb.SheetNames.find((s) => {
+    const l = s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return l.includes('summary') && (l.includes('report') || l.includes('reportial'));
+  });
+
+  return {
+    permitsSummary: permitsSheetName
+      ? parseSingleSummarySheet(wb.Sheets[permitsSheetName], 'permits', permitsSheetName)
+      : null,
+    reportorialSummary: reportorialSheetName
+      ? parseSingleSummarySheet(wb.Sheets[reportorialSheetName], 'reportorial', reportorialSheetName)
+      : null
+  };
+}
+
