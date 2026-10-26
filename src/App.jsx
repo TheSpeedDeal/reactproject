@@ -348,6 +348,7 @@ export default function App() {
   const [previewModule, setPreviewModule] = useState(null);
 
   const fileInputRef = useRef(null);
+  const lastUploadedPermitsFileRef = useRef(null);
   const gridScrollRef = useRef(null);
   const [isMouseDownDragging, setIsMouseDownDragging] = useState(false);
   const dragInfoRef = useRef({
@@ -493,7 +494,8 @@ export default function App() {
         totalRecords: totalRecs,
         uploadedAt: source === 'default' ? 'Baseline Master' : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         status: 'Ready in Cache',
-        workbook: wb
+        workbook: wb,
+        arrayBuffer
       };
 
       setModuleDatasets((prev) => {
@@ -556,6 +558,12 @@ export default function App() {
     reader.onload = (evt) => {
       const arrayBuffer = evt.target.result;
       const sizeStr = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+      lastUploadedPermitsFileRef.current = {
+        file,
+        arrayBuffer,
+        name: file.name,
+        sizeStr
+      };
       processWorkbookData(arrayBuffer, file.name, sizeStr, 'local');
     };
 
@@ -566,6 +574,43 @@ export default function App() {
 
     reader.readAsArrayBuffer(file);
   }, [processWorkbookData]);
+
+  // Synchronize / Reload Data: re-syncs the uploaded file if active, or reloads default
+  const handleSyncData = useCallback(async () => {
+    if (lastUploadedPermitsFileRef.current) {
+      const { file, arrayBuffer, name, sizeStr } = lastUploadedPermitsFileRef.current;
+      setIsLoading(true);
+      setLoadingText(`Re-syncing "${name}"...`);
+      setErrorMessage('');
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const freshBuffer = evt.target.result;
+          lastUploadedPermitsFileRef.current.arrayBuffer = freshBuffer;
+          processWorkbookData(freshBuffer, name, sizeStr, 'local');
+        };
+        reader.onerror = () => {
+          if (arrayBuffer) {
+            processWorkbookData(arrayBuffer, name, sizeStr, 'local');
+          } else {
+            setErrorMessage('Failed to re-read uploaded file.');
+            setIsLoading(false);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+        return;
+      }
+
+      if (arrayBuffer) {
+        processWorkbookData(arrayBuffer, name, sizeStr, 'local');
+        return;
+      }
+    }
+
+    // Default: reload the official baseline 2026 dataset
+    await loadDefaultFile();
+  }, [loadDefaultFile, processWorkbookData]);
 
   // Local file upload handler
   const handleFileUpload = (e) => {
@@ -593,6 +638,15 @@ export default function App() {
         if (targetFile.parsedDataCache) setParsedDataCache(targetFile.parsedDataCache);
         if (targetFile.summaryData) setSummaryData(targetFile.summaryData);
         if (targetFile.workbook) setWorkbook(targetFile.workbook);
+        if (targetFile.origin === 'local') {
+          lastUploadedPermitsFileRef.current = {
+            arrayBuffer: targetFile.arrayBuffer,
+            name: targetFile.name,
+            sizeStr: targetFile.sizeStr
+          };
+        } else if (targetFile.origin === 'default') {
+          lastUploadedPermitsFileRef.current = null;
+        }
       }
 
       return {
@@ -963,7 +1017,7 @@ export default function App() {
           targetPlant={targetPlant}
           setTargetPlant={setTargetPlant}
           targetSearch={targetSearch}
-          onSyncData={loadDefaultFile}
+          onSyncData={handleSyncData}
           onUploadFile={() => setShowUploadModal(true)}
         />
       )}

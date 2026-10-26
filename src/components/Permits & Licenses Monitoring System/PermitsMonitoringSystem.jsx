@@ -68,6 +68,9 @@ export default function PermitsMonitoringSystem({
           onSelectTheme={onSelectTheme}
           onSyncData={onSyncData}
           onUploadFile={onUploadFile}
+          fileName={fileName}
+          fileSize={fileSize}
+          sourceType={sourceType}
         />
       )}
 

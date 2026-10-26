@@ -361,7 +361,10 @@ export default function HomeDashboard({
   currentTheme = 'midnight',
   onSelectTheme,
   onSyncData,
-  onUploadFile
+  onUploadFile,
+  fileName = 'PANB Monitoring 2026',
+  fileSize: _fileSize = '',
+  sourceType = 'default'
 }) {
   // Slicer States (Synced with Compliance Summary Tab)
   const [regionFilter, setRegionFilter] = useState('All');
@@ -1004,7 +1007,7 @@ export default function HomeDashboard({
             <span className="dash-badge-tag">EXECUTIVE VIEW</span>
             <span className="dash-badge-pulse">
               <span className="pulse-dot"></span>
-              {hasLiveExcelData ? `Live Data (${targetSheets.length} Facilities)` : 'Live Compliance Intelligence'}
+              {hasLiveExcelData ? (sourceType === 'local' ? `Uploaded: ${fileName}` : `Live Data (${targetSheets.length} Facilities)`) : 'Live Compliance Intelligence'}
             </span>
           </div>
           <h2 className="dash-hero-heading">Compliance &amp; Regulatory Operations Overview</h2>
@@ -1019,7 +1022,7 @@ export default function HomeDashboard({
               type="button"
               className="btn-dash-sync"
               onClick={onSyncData}
-              title="Reload official 2026 dataset"
+              title={sourceType === 'local' ? `Re-sync uploaded dataset (${fileName})` : "Reload official 2026 dataset"}
               disabled={isLoading}
             >
               <span className="dash-btn-icon">🔄</span>
