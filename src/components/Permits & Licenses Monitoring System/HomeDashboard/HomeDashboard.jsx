@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { getFacilityType, DEFAULT_REGIONS } from '../../../utils/ExcelParsers/excelParserPermitAndLicense';
 import './HomeDashboard.css';
 
 // Baseline fallback dataset matching official 2026 monitoring records
@@ -155,30 +156,6 @@ const BASE_REGULATORY_ACTIONS = [
   }
 ];
 
-// Baseline 12 Months timeline
-const BASE_TIMELINE_MONTHS = [
-  { month: 'Jun', critical: 3, atRisk: 4, stable: 3, total: 10 },
-  { month: 'Jul', critical: 3, atRisk: 7, stable: 8, total: 18 },
-  { month: 'Aug', critical: 3, atRisk: 8, stable: 8, total: 19 },
-  { month: 'Sep', critical: 2, atRisk: 6, stable: 10, total: 18 },
-  { month: 'Oct', critical: 2, atRisk: 3, stable: 13, total: 18 },
-  { month: 'Nov', critical: 0, atRisk: 2, stable: 8, total: 10 },
-  { month: 'Dec', critical: 0, atRisk: 1, stable: 9, total: 10 },
-  { month: 'Jan', critical: 0, atRisk: 3, stable: 7, total: 10 },
-  { month: 'Feb', critical: 0, atRisk: 0, stable: 10, total: 10 },
-  { month: 'Mar', critical: 0, atRisk: 0, stable: 10, total: 10 },
-  { month: 'Apr', critical: 0, atRisk: 0, stable: 5, total: 5 },
-  { month: 'May', critical: 0, atRisk: 0, stable: 4, total: 4 }
-];
-
-// Baseline Donut chart segment definitions
-const BASE_DONUT_SEGMENTS = [
-  { label: 'Quarterly SMRs', pct: 85, color: '#16a34a', count: 182 },
-  { label: 'PMRs', pct: 7, color: '#f59e0b', count: 15 },
-  { label: 'Safety Minutes', pct: 5, color: '#2563eb', count: 11 },
-  { label: 'Pending', pct: 3, color: '#0284c7', count: 6 },
-  { label: 'Missed', pct: 0, color: '#dc2626', count: 1 }
-];
 
 // Helpers for categorizing raw Excel strings
 function categorizeAgency(regBody) {
@@ -238,6 +215,120 @@ function inferType(desc) {
   return 'Permit';
 }
 
+// Check if a date string represents "No Expiry / One-Time Only" (e.g., 12/13/99, 12/31/99, Permanent, Lifetime, etc.)
+function isNoExpiryDate(dateVal) {
+  if (!dateVal) return false;
+  const str = String(dateVal).trim();
+  const lower = str.toLowerCase();
+
+  if (
+    lower.includes('permanent') ||
+    lower.includes('lifetime') ||
+    lower.includes('one-time') ||
+    lower.includes('one time') ||
+    lower.includes('no expiry') ||
+    lower.includes('no expiration') ||
+    lower === 'n/a' ||
+    lower === 'none'
+  ) {
+    return true;
+  }
+
+  // Handle dummy sentinel dates like 12/13/99, 12/31/99, 12/13/1999, 12/13/2099
+  const mdy = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (mdy) {
+    const month = parseInt(mdy[1], 10);
+    const day = parseInt(mdy[2], 10);
+    const year = parseInt(mdy[3], 10);
+
+    // Specifically 12/13/99 or 12/31/99 or year 99 / 2099 / 9999
+    if (month === 12 && (day === 13 || day === 31) && (year === 99 || year === 1999 || year === 2099 || year === 9999)) {
+      return true;
+    }
+    if (year === 9999 || year === 2099 || (year === 99 && month === 12)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Flexible date parser supporting M/D/YY, M/D/YYYY, YYYY-MM-DD, Excel serial numbers, and standard date strings
+function parseFlexibleDate(dateVal) {
+  if (!dateVal) return null;
+  if (isNoExpiryDate(dateVal)) return null;
+
+  if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+    return dateVal;
+  }
+
+  // Handle Excel serial date numbers (e.g. 45000+)
+  if (typeof dateVal === 'number' && dateVal > 25569) {
+    const d = new Date((dateVal - 25569) * 86400000);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  const str = String(dateVal).trim();
+  if (!str || str === 'N/A' || str === '-') {
+    return null;
+  }
+
+  // Check if string is a numeric 5-digit Excel serial (e.g. "46142")
+  if (/^\d{5}$/.test(str)) {
+    const num = Number(str);
+    if (num > 25569) {
+      const d = new Date((num - 25569) * 86400000);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+
+  // Handle M/D/YY or M/D/YYYY (e.g. "4/30/26", "04/30/2026")
+  const mdyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (mdyMatch) {
+    const month = parseInt(mdyMatch[1], 10) - 1;
+    const day = parseInt(mdyMatch[2], 10);
+    let year = parseInt(mdyMatch[3], 10);
+    if (year < 100) {
+      year += year >= 70 ? 1900 : 2000;
+    }
+    const d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // Handle YYYY-MM-DD
+  const ymdMatch = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10) - 1;
+    const day = parseInt(ymdMatch[3], 10);
+    const d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // Fallback to standard JavaScript Date parser
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  return null;
+}
+
+// Calculate exact days remaining relative to current date: Due Date - Current Date
+function calculateDaysRemaining(dueDateVal, refDate = new Date()) {
+  if (isNoExpiryDate(dueDateVal)) return null;
+
+  const target = parseFlexibleDate(dueDateVal);
+  if (!target || isNaN(target.getTime())) return null;
+
+  // Normalize both dates to midnight local time for precise day calculation
+  const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const refMidnight = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
+
+  const diffMs = targetMidnight.getTime() - refMidnight.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+}
+
 const DEFAULT_OFFICERS = [
   'T. Dela Cruz',
   'L. Mercado',
@@ -260,42 +351,10 @@ function getOfficerName(seedStr, idx) {
   return DEFAULT_OFFICERS[Math.abs(hash + idx) % DEFAULT_OFFICERS.length];
 }
 
-function parseMonthName(dateStr) {
-  if (!dateStr) return null;
-  const str = String(dateStr).trim();
-  const lower = str.toLowerCase();
-  if (
-    lower.includes('perpetual') ||
-    lower.includes('permanent') ||
-    lower.includes('lifetime') ||
-    lower.includes('n/a') ||
-    lower === '-' ||
-    lower === '—'
-  ) {
-    return null;
-  }
-  const parts = str.split('/');
-  if (parts.length === 3) {
-    const m = parseInt(parts[0], 10);
-    const yStr = parts[2].trim();
-    const y = parseInt(yStr, 10);
-    // Ignore perpetual dates stored as 99 or >= 2090
-    if (y === 99 || y >= 2090) return null;
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    if (m >= 1 && m <= 12) return months[m - 1];
-  }
-  const dt = new Date(dateStr);
-  if (!isNaN(dt.getTime())) {
-    const fullYear = dt.getFullYear();
-    if (fullYear >= 2090 || fullYear < 2020) return null;
-    return dt.toLocaleString('en-US', { month: 'short' });
-  }
-  return null;
-}
-
 export default function HomeDashboard({
   onNavigateToTable,
   parsedDataCache = {},
+  summaryData = { permitsSummary: null, reportorialSummary: null },
   targetSheets = [],
   plantRegions = {},
   isLoading = false,
@@ -304,10 +363,12 @@ export default function HomeDashboard({
   onSyncData,
   onUploadFile
 }) {
-  // Slicer States (Fully Functional)
+  // Slicer States (Synced with Compliance Summary Tab)
   const [regionFilter, setRegionFilter] = useState('All');
-  const [departmentFilter, setDepartmentFilter] = useState('All');
-  const [deadlineFilter, setDeadlineFilter] = useState('ALL'); // 'ALL' | 'OVERDUE' | '30D' | '60D' | '90D' | 'STABLE'
+  const [businessFilter, setBusinessFilter] = useState('All'); // 'All' | 'BMP' | 'MPH' | 'MPPP' | 'MPF'
+  const [facilityFilter, setFacilityFilter] = useState('All'); // 'All' | specific facility
+  const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Active' | 'Upcoming' | 'Overdue' | 'Critical'
+  const [agencyFilter, setAgencyFilter] = useState('All'); // 'All' | specific agency
   const [globalAgencyFilters, setGlobalAgencyFilters] = useState({
     DENR: true,
     DOLE: true,
@@ -315,12 +376,6 @@ export default function HomeDashboard({
     Others: true
   });
   const [isFilterCollapsed, setIsFilterCollapsed] = useState(false);
-
-  // Chart cross-filter state
-  const [selectedTimelineMonth, setSelectedTimelineMonth] = useState(null);
-  const [selectedDonutSegment, setSelectedDonutSegment] = useState(null);
-  const [selectedDeptChart, setSelectedDeptChart] = useState(null);
-  const [selectedFrequency, setSelectedFrequency] = useState(null);
 
   // Table Search and Sorting
   const [tableSearch, setTableSearch] = useState('');
@@ -332,7 +387,20 @@ export default function HomeDashboard({
 
   // Modal / Detail state
   const [activeItemDetail, setActiveItemDetail] = useState(null);
-  const [tooltipState, setTooltipState] = useState(null);
+
+  // Enhance base regulatory actions with dynamically calculated days remaining relative to current date
+  const dynamicBaseActions = useMemo(() => {
+    return BASE_REGULATORY_ACTIONS.map((action) => {
+      const noExpiry = isNoExpiryDate(action.dueDate);
+      const calcDays = noExpiry ? null : calculateDaysRemaining(action.dueDate);
+      return {
+        ...action,
+        daysRemaining: calcDays,
+        isNoExpiry: noExpiry,
+        status: noExpiry ? 'Upcoming' : (calcDays !== null && calcDays < 0 ? 'Overdue' : 'Upcoming')
+      };
+    });
+  }, []);
 
   // Detect if live parsed Excel dataset is active
   const hasLiveExcelData = useMemo(() => {
@@ -345,7 +413,7 @@ export default function HomeDashboard({
       return {
         permits: [],
         reportorial: [],
-        urgentActions: BASE_REGULATORY_ACTIONS
+        urgentActions: dynamicBaseActions
       };
     }
 
@@ -364,9 +432,14 @@ export default function HomeDashboard({
         const agency = categorizeAgency(p.regulatoryBody);
         const department = inferDepartment(p.description, p.regulatoryBody);
         const type = inferType(p.description);
-        const days = p.daysToExpireNum;
-        const isExpired = p.status === 'Expired' || (days !== null && days < 0);
-        const isExpiringSoon = days !== null && days >= 0 && days <= 90;
+
+        // Dynamically compute exact days remaining: Expiration Date - Current Date
+        const noExpiry = isNoExpiryDate(p.expirationDate);
+        const calcDays = noExpiry ? null : calculateDaysRemaining(p.expirationDate);
+        const days = calcDays !== null ? calcDays : (noExpiry ? null : p.daysToExpireNum);
+        const isExpired = !noExpiry && (p.status === 'Expired' || (days !== null && days < 0));
+        const isExpiringSoon = !noExpiry && days !== null && days >= 0 && days <= 90;
+        const isUpcomingRenewal = !noExpiry && (days !== null ? days >= 0 : p.status === 'Active');
 
         const permitItem = {
           id: p.id || `live-p-${sName}-${idx}`,
@@ -374,7 +447,8 @@ export default function HomeDashboard({
           type,
           agency,
           dueDate: p.expirationDate || 'N/A',
-          daysRemaining: days !== null ? days : isExpired ? -1 : 120,
+          daysRemaining: days,
+          isNoExpiry: noExpiry,
           owner: getOfficerName(sName + (p.description || ''), idx),
           department,
           status: isExpired ? 'Overdue' : 'Upcoming',
@@ -388,7 +462,7 @@ export default function HomeDashboard({
 
         permitsList.push(permitItem);
 
-        if (isExpired || isExpiringSoon) {
+        if (isExpired || isExpiringSoon || isUpcomingRenewal) {
           urgentList.push(permitItem);
         }
       });
@@ -397,7 +471,14 @@ export default function HomeDashboard({
       (sheet.reportorial || []).forEach((r, idx) => {
         const agency = categorizeAgency(r.regulatoryBody);
         const department = inferDepartment(r.description, r.regulatoryBody);
-        const isOverdue = r.status === 'Late Submission' || r.status === 'Not Submitted';
+
+        // Dynamically compute exact days remaining: Report Deadline - Current Date
+        const noExpiry = isNoExpiryDate(r.deadline);
+        const calcDays = noExpiry ? null : calculateDaysRemaining(r.deadline);
+        const isOverdue = !noExpiry && (r.status === 'Late Submission' || r.status === 'Not Submitted' || (calcDays !== null && calcDays < 0));
+        const days = noExpiry ? null : (calcDays !== null ? calcDays : (isOverdue ? -14 : 28));
+        const isUpcomingSoon = !noExpiry && !isOverdue && days !== null && days >= 0 && days <= 60;
+        const isUpcomingReport = !noExpiry && !isOverdue && (days !== null ? days >= 0 : r.status === 'Submitted On-time');
 
         const reportItem = {
           id: r.id || `live-r-${sName}-${idx}`,
@@ -405,10 +486,11 @@ export default function HomeDashboard({
           type: 'Report',
           agency,
           dueDate: r.deadline || 'N/A',
-          daysRemaining: isOverdue ? -14 : 28,
+          daysRemaining: days,
+          isNoExpiry: noExpiry,
           owner: getOfficerName(sName + (r.description || ''), idx),
           department,
-          status: isOverdue ? 'Overdue' : 'Upcoming',
+          status: noExpiry ? 'Upcoming' : ((days !== null ? days < 0 : isOverdue) ? 'Overdue' : 'Upcoming'),
           region,
           plant: sName,
           permitNo: r.itemCode || 'N/A',
@@ -420,7 +502,7 @@ export default function HomeDashboard({
 
         reportorialList.push(reportItem);
 
-        if (isOverdue) {
+        if (isOverdue || isUpcomingSoon || isUpcomingReport) {
           urgentList.push(reportItem);
         }
       });
@@ -429,9 +511,73 @@ export default function HomeDashboard({
     return {
       permits: permitsList,
       reportorial: reportorialList,
-      urgentActions: urgentList.length > 0 ? urgentList : BASE_REGULATORY_ACTIONS
+      urgentActions: urgentList.length > 0 ? urgentList : dynamicBaseActions
     };
-  }, [hasLiveExcelData, parsedDataCache, plantRegions]);
+  }, [hasLiveExcelData, parsedDataCache, plantRegions, dynamicBaseActions]);
+
+  // Available facilities filtered dynamically by region and business (Compliance Summary Tab)
+  const availableFacilities = useMemo(() => {
+    let list = [];
+    if (targetSheets && targetSheets.length > 0) {
+      list = [...targetSheets];
+    } else if (summaryData?.permitsSummary?.plants?.length) {
+      list = summaryData.permitsSummary.plants.map((p) => p.plant);
+    } else {
+      list = Object.keys(DEFAULT_REGIONS);
+    }
+
+    if (regionFilter !== 'All') {
+      list = list.filter((pName) => {
+        const reg = plantRegions[pName] || DEFAULT_REGIONS[pName];
+        return reg === regionFilter;
+      });
+    }
+
+    if (businessFilter !== 'All') {
+      list = list.filter((pName) => {
+        const fType = getFacilityType(pName);
+        return fType.code === businessFilter;
+      });
+    }
+
+    return Array.from(new Set(list)).sort();
+  }, [targetSheets, summaryData, plantRegions, regionFilter, businessFilter]);
+
+  // Derived effective facility selection (auto-resets to 'All' if selected facility is filtered out by region/business)
+  const effectiveFacilityFilter = useMemo(() => {
+    if (facilityFilter === 'All') return 'All';
+    return availableFacilities.includes(facilityFilter) ? facilityFilter : 'All';
+  }, [availableFacilities, facilityFilter]);
+
+  // Available regulatory agencies extracted from Compliance Summary Tab & datasets
+  const availableAgencies = useMemo(() => {
+    const set = new Set();
+    if (summaryData?.permitsSummary?.items) {
+      summaryData.permitsSummary.items.forEach((it) => {
+        if (it.agency) set.add(it.agency);
+      });
+    }
+    if (summaryData?.reportorialSummary?.items) {
+      summaryData.reportorialSummary.items.forEach((it) => {
+        if (it.agency) set.add(it.agency);
+      });
+    }
+    if (liveDataset?.permits) {
+      liveDataset.permits.forEach((p) => {
+        if (p.agency) set.add(p.agency);
+      });
+    }
+    if (liveDataset?.reportorial) {
+      liveDataset.reportorial.forEach((r) => {
+        if (r.agency) set.add(r.agency);
+      });
+    }
+    BASE_REGULATORY_ACTIONS.forEach((a) => {
+      if (a.agency) set.add(a.agency);
+    });
+    ['DENR', 'DOLE', 'DOE', 'BFP', 'LGU'].forEach((a) => set.add(a));
+    return Array.from(set).filter(Boolean).sort();
+  }, [summaryData, liveDataset]);
 
   // Toggle agency filter
   const toggleAgencyFilter = (agencyKey) => {
@@ -453,13 +599,11 @@ export default function HomeDashboard({
   // Reset all filters to default
   const handleResetFilters = () => {
     setRegionFilter('All');
-    setDepartmentFilter('All');
-    setDeadlineFilter('ALL');
+    setBusinessFilter('All');
+    setFacilityFilter('All');
+    setStatusFilter('All');
+    setAgencyFilter('All');
     setGlobalAgencyFilters({ DENR: true, DOLE: true, DOE: true, Others: true });
-    setSelectedTimelineMonth(null);
-    setSelectedDonutSegment(null);
-    setSelectedDeptChart(null);
-    setSelectedFrequency(null);
     setTableSearch('');
     setTableStatusFilter('All');
     setCurrentPage(1);
@@ -469,25 +613,21 @@ export default function HomeDashboard({
   const isAnyFilterActive = useMemo(() => {
     return (
       regionFilter !== 'All' ||
-      departmentFilter !== 'All' ||
-      deadlineFilter !== 'ALL' ||
+      businessFilter !== 'All' ||
+      effectiveFacilityFilter !== 'All' ||
+      statusFilter !== 'All' ||
+      agencyFilter !== 'All' ||
       !Object.values(globalAgencyFilters).every(Boolean) ||
-      selectedTimelineMonth !== null ||
-      selectedDonutSegment !== null ||
-      selectedDeptChart !== null ||
-      selectedFrequency !== null ||
       tableSearch.trim() !== '' ||
       tableStatusFilter !== 'All'
     );
   }, [
     regionFilter,
-    departmentFilter,
-    deadlineFilter,
+    businessFilter,
+    effectiveFacilityFilter,
+    statusFilter,
+    agencyFilter,
     globalAgencyFilters,
-    selectedTimelineMonth,
-    selectedDonutSegment,
-    selectedDeptChart,
-    selectedFrequency,
     tableSearch,
     tableStatusFilter
   ]);
@@ -496,99 +636,130 @@ export default function HomeDashboard({
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (regionFilter !== 'All') count++;
-    if (departmentFilter !== 'All') count++;
-    if (deadlineFilter !== 'ALL') count++;
+    if (businessFilter !== 'All') count++;
+    if (effectiveFacilityFilter !== 'All') count++;
+    if (statusFilter !== 'All') count++;
+    if (agencyFilter !== 'All') count++;
     if (!Object.values(globalAgencyFilters).every(Boolean)) count++;
-    if (selectedTimelineMonth) count++;
-    if (selectedDonutSegment) count++;
-    if (selectedDeptChart) count++;
-    if (selectedFrequency) count++;
     if (tableSearch.trim()) count++;
     if (tableStatusFilter !== 'All') count++;
     return count;
   }, [
     regionFilter,
-    departmentFilter,
-    deadlineFilter,
+    businessFilter,
+    effectiveFacilityFilter,
+    statusFilter,
+    agencyFilter,
     globalAgencyFilters,
-    selectedTimelineMonth,
-    selectedDonutSegment,
-    selectedDeptChart,
-    selectedFrequency,
     tableSearch,
     tableStatusFilter
   ]);
 
-  // Filtered urgent actions table rows
+  // Base filtered actions (respecting slicers and search box, but NOT tableStatusFilter)
+  const baseFilteredActions = useMemo(() => {
+    const sourceActions = hasLiveExcelData ? liveDataset.urgentActions : dynamicBaseActions;
+
+    return sourceActions.filter((item) => {
+      // 1. Region filter
+      if (regionFilter !== 'All' && item.region !== regionFilter) return false;
+
+      // 2. Business filter (from Compliance Summary Tab: BMP, MPH, MPPP, MPF)
+      if (businessFilter !== 'All') {
+        const itemFType = getFacilityType(item.plant);
+        if (itemFType.code !== businessFilter) return false;
+      }
+
+      // 3. Facilities filter (from Compliance Summary Tab)
+      if (effectiveFacilityFilter !== 'All' && item.plant !== effectiveFacilityFilter) return false;
+
+      // 4. Status filter (from Compliance Summary Tab: Active, Action Required / Overdue, Upcoming, Critical)
+      if (statusFilter !== 'All') {
+        if (statusFilter === 'Overdue' || statusFilter === 'Action Required') {
+          const isOverdue =
+            item.status === 'Overdue' ||
+            (item.daysRemaining !== null && item.daysRemaining < 0) ||
+            item.rawStatus === 'Action Required' ||
+            item.rawStatus === 'Expired' ||
+            item.rawStatus === 'Late Submission' ||
+            item.rawStatus === 'Not Submitted';
+          if (!isOverdue) return false;
+        } else if (statusFilter === 'Upcoming') {
+          const isUpcoming = item.status === 'Upcoming' && (item.daysRemaining === null || item.daysRemaining >= 0);
+          if (!isUpcoming) return false;
+        } else if (statusFilter === 'Active') {
+          const isActive = item.rawStatus === 'Active' || item.status === 'Upcoming' || (item.daysRemaining !== null && item.daysRemaining > 0);
+          if (!isActive) return false;
+        } else if (statusFilter === 'Critical') {
+          if (item.daysRemaining === null || item.daysRemaining < 0 || item.daysRemaining > 30) return false;
+        }
+      }
+
+      // 5. Agency dropdown filter (from Compliance Summary Tab)
+      if (agencyFilter !== 'All' && item.agency !== agencyFilter) return false;
+
+      // 6. Regulatory agency toggles
+      if (globalAgencyFilters[item.agency] === false) return false;
+
+      // 7. Search query
+      if (tableSearch.trim()) {
+        const q = tableSearch.toLowerCase();
+        const match =
+          item.name.toLowerCase().includes(q) ||
+          item.type.toLowerCase().includes(q) ||
+          item.owner.toLowerCase().includes(q) ||
+          item.department.toLowerCase().includes(q) ||
+          item.plant.toLowerCase().includes(q) ||
+          item.permitNo.toLowerCase().includes(q) ||
+          item.status.toLowerCase().includes(q) ||
+          item.agency.toLowerCase().includes(q) ||
+          (item.region && item.region.toLowerCase().includes(q)) ||
+          (item.notes && item.notes.toLowerCase().includes(q));
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [
+    hasLiveExcelData,
+    liveDataset.urgentActions,
+    dynamicBaseActions,
+    regionFilter,
+    businessFilter,
+    effectiveFacilityFilter,
+    statusFilter,
+    agencyFilter,
+    globalAgencyFilters,
+    tableSearch
+  ]);
+
+  // Stable counts for the 3 sub-tabs (computed from baseFilteredActions so they NEVER zero out when switching tabs)
+  const actionCounts = useMemo(() => {
+    const all = baseFilteredActions.length;
+    const overdue = baseFilteredActions.filter((a) => a.status === 'Overdue').length;
+    const upcoming = baseFilteredActions.filter((a) => a.status === 'Upcoming').length;
+    return { all, overdue, upcoming };
+  }, [baseFilteredActions]);
+
+  // Filtered and sorted urgent actions table rows
   const filteredActions = useMemo(() => {
-    const sourceActions = hasLiveExcelData ? liveDataset.urgentActions : BASE_REGULATORY_ACTIONS;
-
-    return sourceActions
+    return baseFilteredActions
       .filter((item) => {
-        // 1. Region filter
-        if (regionFilter !== 'All' && item.region !== regionFilter) return false;
-
-        // 2. Department filter
-        if (departmentFilter !== 'All' && item.department !== departmentFilter) return false;
-
-        // 3. Department cross-filter from chart
-        if (selectedDeptChart && item.department !== selectedDeptChart) return false;
-
-        // 4. Regulatory agency toggles
-        if (!globalAgencyFilters[item.agency]) return false;
-
-        // 5. Deadline horizon filter
-        if (deadlineFilter === 'OVERDUE' && item.daysRemaining >= 0) return false;
-        if (deadlineFilter === '30D' && (item.daysRemaining < 0 || item.daysRemaining > 30)) return false;
-        if (deadlineFilter === '60D' && (item.daysRemaining < 0 || item.daysRemaining > 60)) return false;
-        if (deadlineFilter === '90D' && (item.daysRemaining < 0 || item.daysRemaining > 90)) return false;
-        if (deadlineFilter === 'STABLE' && item.daysRemaining <= 90) return false;
-
-        // 6. Timeline month cross-filter
-        if (selectedTimelineMonth) {
-          const itemMonth = parseMonthName(item.dueDate);
-          if (itemMonth !== selectedTimelineMonth) return false;
-        }
-
-        // 7. Donut segment cross-filter
-        if (selectedDonutSegment) {
-          const txt = `${item.name} ${item.notes}`.toUpperCase();
-          if (selectedDonutSegment === 'Quarterly SMRs' && !txt.includes('SMR')) return false;
-          if (selectedDonutSegment === 'PMRs' && !txt.includes('PMR')) return false;
-          if (selectedDonutSegment === 'Safety Minutes' && !txt.includes('SAFETY') && !txt.includes('OSH')) return false;
-          if (selectedDonutSegment === 'Pending' && item.status !== 'Upcoming') return false;
-          if (selectedDonutSegment === 'Missed' && item.status !== 'Overdue') return false;
-        }
-
-        // 8. Table status sub-tabs
+        // Table status sub-tabs filter
         if (tableStatusFilter !== 'All' && item.status !== tableStatusFilter) return false;
-
-        // 9. Frequency cross-filter
-        if (selectedFrequency) {
-          if (selectedFrequency === 'Monthly' && item.type !== 'Report') return false;
-          if (selectedFrequency === 'Quarterly' && !item.name.toUpperCase().includes('SMR') && item.type !== 'Report') {
-            return false;
-          }
-          if (selectedFrequency === 'Annual' && item.type !== 'License' && item.type !== 'Clearance') return false;
-        }
-
-        // 10. Search query
-        if (tableSearch.trim()) {
-          const q = tableSearch.toLowerCase();
-          const match =
-            item.name.toLowerCase().includes(q) ||
-            item.type.toLowerCase().includes(q) ||
-            item.owner.toLowerCase().includes(q) ||
-            item.department.toLowerCase().includes(q) ||
-            item.plant.toLowerCase().includes(q) ||
-            item.permitNo.toLowerCase().includes(q) ||
-            item.status.toLowerCase().includes(q) ||
-            item.agency.toLowerCase().includes(q);
-          if (!match) return false;
-        }
         return true;
       })
       .sort((a, b) => {
+        if (sortField === 'daysRemaining') {
+          const numA = typeof a.daysRemaining === 'number' && !isNaN(a.daysRemaining) ? a.daysRemaining : (sortAsc ? 999999 : -999999);
+          const numB = typeof b.daysRemaining === 'number' && !isNaN(b.daysRemaining) ? b.daysRemaining : (sortAsc ? 999999 : -999999);
+          return sortAsc ? numA - numB : numB - numA;
+        }
+        if (sortField === 'dueDate') {
+          const dateA = parseFlexibleDate(a.dueDate);
+          const dateB = parseFlexibleDate(b.dueDate);
+          const timeA = dateA ? dateA.getTime() : (sortAsc ? 9999999999999 : -9999999999999);
+          const timeB = dateB ? dateB.getTime() : (sortAsc ? 9999999999999 : -9999999999999);
+          return sortAsc ? timeA - timeB : timeB - timeA;
+        }
         const valA = a[sortField];
         const valB = b[sortField];
         if (typeof valA === 'string') {
@@ -597,18 +768,8 @@ export default function HomeDashboard({
         return sortAsc ? valA - valB : valB - valA;
       });
   }, [
-    hasLiveExcelData,
-    liveDataset.urgentActions,
-    regionFilter,
-    departmentFilter,
-    selectedDeptChart,
-    globalAgencyFilters,
-    deadlineFilter,
-    selectedTimelineMonth,
-    selectedDonutSegment,
+    baseFilteredActions,
     tableStatusFilter,
-    selectedFrequency,
-    tableSearch,
     sortField,
     sortAsc
   ]);
@@ -625,11 +786,11 @@ export default function HomeDashboard({
     if (!hasLiveExcelData) {
       const isDefault =
         regionFilter === 'All' &&
-        departmentFilter === 'All' &&
-        deadlineFilter === 'ALL' &&
-        Object.values(globalAgencyFilters).every(Boolean) &&
-        !selectedDeptChart &&
-        !selectedTimelineMonth;
+        businessFilter === 'All' &&
+        effectiveFacilityFilter === 'All' &&
+        statusFilter === 'All' &&
+        agencyFilter === 'All' &&
+        Object.values(globalAgencyFilters).every(Boolean);
 
       if (isDefault) {
         return {
@@ -645,13 +806,14 @@ export default function HomeDashboard({
 
       let factor = 1.0;
       if (regionFilter !== 'All') factor *= 0.35;
-      if (departmentFilter !== 'All') factor *= 0.45;
-      if (selectedDeptChart) factor *= 0.4;
-      if (deadlineFilter !== 'ALL') factor *= 0.5;
+      if (businessFilter !== 'All') factor *= 0.3;
+      if (effectiveFacilityFilter !== 'All') factor *= 0.15;
+      if (statusFilter !== 'All') factor *= 0.5;
+      if (agencyFilter !== 'All') factor *= 0.35;
 
-      const denrCount = globalAgencyFilters.DENR ? Math.max(1, Math.round(80 * factor)) : 0;
-      const doleCount = globalAgencyFilters.DOLE ? Math.max(1, Math.round(45 * factor)) : 0;
-      const doeCount = globalAgencyFilters.DOE ? Math.max(1, Math.round(17 * factor)) : 0;
+      const denrCount = (agencyFilter === 'All' || agencyFilter === 'DENR') && globalAgencyFilters.DENR ? Math.max(1, Math.round(80 * factor)) : 0;
+      const doleCount = (agencyFilter === 'All' || agencyFilter === 'DOLE') && globalAgencyFilters.DOLE ? Math.max(1, Math.round(45 * factor)) : 0;
+      const doeCount = (agencyFilter === 'All' || agencyFilter === 'DOE') && globalAgencyFilters.DOE ? Math.max(1, Math.round(17 * factor)) : 0;
       const totalCount = denrCount + doleCount + doeCount;
       const overdueCount = filteredActions.filter((a) => a.status === 'Overdue').length;
       const dueCount = filteredActions.filter((a) => a.daysRemaining >= 0 && a.daysRemaining <= 30).length;
@@ -674,14 +836,14 @@ export default function HomeDashboard({
     // Live Excel KPI Calculations
     const candidatePermits = liveDataset.permits.filter((p) => {
       if (regionFilter !== 'All' && p.region !== regionFilter) return false;
-      if (departmentFilter !== 'All' && p.department !== departmentFilter) return false;
-      if (selectedDeptChart && p.department !== selectedDeptChart) return false;
+      if (businessFilter !== 'All' && getFacilityType(p.plant).code !== businessFilter) return false;
+      if (effectiveFacilityFilter !== 'All' && p.plant !== effectiveFacilityFilter) return false;
+      if (agencyFilter !== 'All' && p.agency !== agencyFilter) return false;
       if (!globalAgencyFilters[p.agency]) return false;
-      if (deadlineFilter === 'OVERDUE' && p.daysRemaining >= 0) return false;
-      if (deadlineFilter === '30D' && (p.daysRemaining < 0 || p.daysRemaining > 30)) return false;
-      if (deadlineFilter === '60D' && (p.daysRemaining < 0 || p.daysRemaining > 60)) return false;
-      if (deadlineFilter === '90D' && (p.daysRemaining < 0 || p.daysRemaining > 90)) return false;
-      if (deadlineFilter === 'STABLE' && p.daysRemaining <= 90) return false;
+      if ((statusFilter === 'Overdue' || statusFilter === 'Action Required') && !(p.status === 'Overdue' || (p.daysRemaining !== null && p.daysRemaining < 0))) return false;
+      if (statusFilter === 'Upcoming' && (p.status === 'Overdue' || (p.daysRemaining !== null && p.daysRemaining < 0))) return false;
+      if (statusFilter === 'Active' && p.rawStatus !== 'Active') return false;
+      if (statusFilter === 'Critical' && (p.daysRemaining === null || p.daysRemaining < 0 || p.daysRemaining > 30)) return false;
       return true;
     });
 
@@ -690,10 +852,10 @@ export default function HomeDashboard({
     const doe = candidatePermits.filter((p) => p.agency === 'DOE').length;
     const total = candidatePermits.length;
 
-    const expired = candidatePermits.filter((p) => p.status === 'Overdue' || (p.daysRemaining !== null && p.daysRemaining < 0)).length;
-    const dueUnder30 = candidatePermits.filter((p) => p.daysRemaining >= 0 && p.daysRemaining <= 30).length;
+    const expired = candidatePermits.filter((p) => !p.isNoExpiry && (p.status === 'Overdue' || (p.daysRemaining !== null && p.daysRemaining < 0))).length;
+    const dueUnder30 = candidatePermits.filter((p) => !p.isNoExpiry && p.daysRemaining !== null && p.daysRemaining >= 0 && p.daysRemaining <= 30).length;
 
-    const activeCount = candidatePermits.filter((p) => p.rawStatus === 'Active' && p.daysRemaining >= 0).length;
+    const activeCount = candidatePermits.filter((p) => p.rawStatus === 'Active' && (p.isNoExpiry || p.daysRemaining === null || p.daysRemaining >= 0)).length;
     const compRate = total > 0 ? Math.min(100, Math.round((activeCount / total) * 100)) : 94;
 
     return {
@@ -705,218 +867,118 @@ export default function HomeDashboard({
       dueUnder30,
       compliance: compRate
     };
-  }, [hasLiveExcelData, liveDataset.permits, regionFilter, departmentFilter, deadlineFilter, globalAgencyFilters, selectedDeptChart, selectedTimelineMonth, filteredActions]);
+  }, [hasLiveExcelData, liveDataset.permits, regionFilter, businessFilter, effectiveFacilityFilter, statusFilter, agencyFilter, globalAgencyFilters, filteredActions]);
 
-  // Dynamic Timeline Months (Jun to May) strictly filtered
-  const timelineMonths = useMemo(() => {
+  // Dynamic Reportorial Requirements KPI calculations strictly respecting all filters
+  const reportorialKpis = useMemo(() => {
     if (!hasLiveExcelData) {
-      return BASE_TIMELINE_MONTHS.map((m) => {
-        let factor = 1.0;
-        if (regionFilter !== 'All') factor *= 0.5;
-        if (departmentFilter !== 'All') factor *= 0.45;
+      const isDefault =
+        regionFilter === 'All' &&
+        businessFilter === 'All' &&
+        effectiveFacilityFilter === 'All' &&
+        statusFilter === 'All' &&
+        agencyFilter === 'All' &&
+        Object.values(globalAgencyFilters).every(Boolean);
+
+      if (isDefault) {
         return {
-          ...m,
-          critical: Math.max(0, Math.round(m.critical * factor)),
-          atRisk: Math.max(0, Math.round(m.atRisk * factor)),
-          stable: Math.max(1, Math.round(m.stable * factor)),
-          total: Math.max(1, Math.round(m.total * factor))
+          onTime: 842,
+          late: 36,
+          notSubmitted: 18,
+          total: 896,
+          denr: 395,
+          dole: 312,
+          doe: 94,
+          compliance: 94
         };
-      });
-    }
-
-    const monthsOrder = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'];
-    const buckets = {};
-    monthsOrder.forEach((m) => {
-      buckets[m] = { month: m, critical: 0, atRisk: 0, stable: 0, total: 0 };
-    });
-
-    liveDataset.permits.forEach((p) => {
-      if (regionFilter !== 'All' && p.region !== regionFilter) return;
-      if (departmentFilter !== 'All' && p.department !== departmentFilter) return;
-      if (selectedDeptChart && p.department !== selectedDeptChart) return;
-      if (!globalAgencyFilters[p.agency]) return;
-
-      // Only include permits within the 12-month renewal/expiration monitoring horizon
-      if (p.daysRemaining !== null && (p.daysRemaining < -60 || p.daysRemaining > 365)) return;
-
-      const m = parseMonthName(p.dueDate);
-      if (m && buckets[m]) {
-        if (p.daysRemaining <= 30) {
-          buckets[m].critical++;
-        } else if (p.daysRemaining <= 60) {
-          buckets[m].atRisk++;
-        } else {
-          buckets[m].stable++;
-        }
-        buckets[m].total++;
       }
-    });
 
-    return monthsOrder.map((m) => {
-      const b = buckets[m];
-      return b.total > 0 ? b : BASE_TIMELINE_MONTHS.find((base) => base.month === m) || b;
-    });
-  }, [hasLiveExcelData, liveDataset.permits, regionFilter, departmentFilter, selectedDeptChart, globalAgencyFilters]);
+      let factor = 1.0;
+      if (regionFilter !== 'All') factor *= 0.35;
+      if (businessFilter !== 'All') factor *= 0.3;
+      if (effectiveFacilityFilter !== 'All') factor *= 0.15;
+      if (statusFilter !== 'All') factor *= 0.5;
+      if (agencyFilter !== 'All') factor *= 0.35;
 
-  // Donut chart segment definitions strictly filtered
-  const donutSegments = useMemo(() => {
-    if (!hasLiveExcelData || liveDataset.reportorial.length === 0) {
-      return BASE_DONUT_SEGMENTS;
+      const denrCount = (agencyFilter === 'All' || agencyFilter === 'DENR') && globalAgencyFilters.DENR ? Math.max(1, Math.round(395 * factor)) : 0;
+      const doleCount = (agencyFilter === 'All' || agencyFilter === 'DOLE') && globalAgencyFilters.DOLE ? Math.max(1, Math.round(312 * factor)) : 0;
+      const doeCount = (agencyFilter === 'All' || agencyFilter === 'DOE') && globalAgencyFilters.DOE ? Math.max(1, Math.round(94 * factor)) : 0;
+      const onTimeCount = denrCount + doleCount + doeCount;
+      const lateCount = Math.max(0, Math.round(36 * factor));
+      const notSubmittedCount = Math.max(0, Math.round(18 * factor));
+      const totalCount = onTimeCount + lateCount + notSubmittedCount;
+      const compRate = totalCount > 0 ? Math.min(100, Math.round((onTimeCount / totalCount) * 100)) : 94;
+
+      return {
+        onTime: onTimeCount,
+        late: lateCount,
+        notSubmitted: notSubmittedCount,
+        total: totalCount,
+        denr: denrCount,
+        dole: doleCount,
+        doe: doeCount,
+        compliance: compRate
+      };
     }
 
-    const reports = liveDataset.reportorial.filter((r) => {
+    // Live Excel Reportorial KPI Calculations
+    const candidateReports = liveDataset.reportorial.filter((r) => {
       if (regionFilter !== 'All' && r.region !== regionFilter) return false;
-      if (departmentFilter !== 'All' && r.department !== departmentFilter) return false;
-      if (selectedDeptChart && r.department !== selectedDeptChart) return false;
+      if (businessFilter !== 'All' && getFacilityType(r.plant).code !== businessFilter) return false;
+      if (effectiveFacilityFilter !== 'All' && r.plant !== effectiveFacilityFilter) return false;
+      if (agencyFilter !== 'All' && r.agency !== agencyFilter) return false;
       if (!globalAgencyFilters[r.agency]) return false;
+
+      const s = String(r.rawStatus || '').toLowerCase().trim();
+      const isOnTime = s.includes('on-time') || s.includes('on time') || s === 'submitted' || s.includes('compliant') || s === 'updated';
+      const isLate = s.includes('late');
+      const isNotSubmitted = s.includes('not submitted') || s.includes('missing') || s === 'unsubmitted' || s.includes('non-compliant');
+
+      if (statusFilter === 'Active' && !isOnTime) return false;
+      if ((statusFilter === 'Overdue' || statusFilter === 'Action Required') && !(isLate || isNotSubmitted)) return false;
+      if (statusFilter === 'Upcoming' && (isLate || isNotSubmitted)) return false;
+      if (statusFilter === 'Critical' && !isNotSubmitted) return false;
       return true;
     });
 
-    const total = reports.length || 1;
-    let smrCount = 0;
-    let pmrCount = 0;
-    let safetyCount = 0;
-    let pendingCount = 0;
-    let missedCount = 0;
+    const isReportOnTime = (r) => {
+      const s = String(r.rawStatus || '').toLowerCase().trim();
+      return s.includes('on-time') || s.includes('on time') || s === 'submitted' || s.includes('compliant') || s === 'updated';
+    };
 
-    reports.forEach((r) => {
-      const text = `${r.name} ${r.notes}`.toUpperCase();
-      if (r.rawStatus === 'Late Submission' || r.rawStatus === 'Not Submitted') {
-        missedCount++;
-      } else if (text.includes('SMR') || text.includes('SELF-MONITORING')) {
-        smrCount++;
-      } else if (text.includes('PMR') || text.includes('COMPLIANCE')) {
-        pmrCount++;
-      } else if (text.includes('SAFETY') || text.includes('OSH') || r.agency === 'DOLE') {
-        safetyCount++;
-      } else {
-        pendingCount++;
-      }
-    });
+    const isReportLate = (r) => {
+      const s = String(r.rawStatus || '').toLowerCase().trim();
+      return s.includes('late');
+    };
 
-    const pSmr = Math.max(1, Math.round((smrCount / total) * 100));
-    const pPmr = Math.max(1, Math.round((pmrCount / total) * 100));
-    const pSaf = Math.max(1, Math.round((safetyCount / total) * 100));
-    const pPen = Math.max(1, Math.round((pendingCount / total) * 100));
-    const pMis = Math.max(0, 100 - (pSmr + pPmr + pSaf + pPen));
+    const isReportNotSubmitted = (r) => {
+      const s = String(r.rawStatus || '').toLowerCase().trim();
+      return s.includes('not submitted') || s.includes('missing') || s === 'unsubmitted' || s.includes('non-compliant');
+    };
 
-    return [
-      { label: 'Quarterly SMRs', pct: pSmr, color: '#10b981', count: smrCount },
-      { label: 'PMRs', pct: pPmr, color: '#f59e0b', count: pmrCount },
-      { label: 'Safety Minutes', pct: pSaf, color: '#3b82f6', count: safetyCount },
-      { label: 'Pending', pct: pPen, color: '#06b6d4', count: pendingCount },
-      { label: 'Missed', pct: Math.max(0, pMis), color: '#f43f5e', count: missedCount }
-    ];
-  }, [hasLiveExcelData, liveDataset.reportorial, regionFilter, departmentFilter, selectedDeptChart, globalAgencyFilters]);
+    const onTime = candidateReports.filter(isReportOnTime).length;
+    const late = candidateReports.filter(isReportLate).length;
+    const notSubmitted = candidateReports.filter(isReportNotSubmitted).length;
+    const total = candidateReports.length;
 
-  // Precompute SVG donut paths
-  const donutPaths = useMemo(() => {
-    const cx = 110;
-    const cy = 110;
-    const outerR = 85;
-    const innerR = 52;
-    const toRad = (deg) => ((deg - 90) * Math.PI) / 180;
+    const denr = candidateReports.filter((r) => r.agency === 'DENR' && isReportOnTime(r)).length;
+    const dole = candidateReports.filter((r) => r.agency === 'DOLE' && isReportOnTime(r)).length;
+    const doe = candidateReports.filter((r) => r.agency === 'DOE' && isReportOnTime(r)).length;
 
-    let runningOffset = 0;
-    const paths = [];
+    const evaluatedTotal = onTime + late + notSubmitted;
+    const compRate = evaluatedTotal > 0 ? Math.min(100, Math.round((onTime / evaluatedTotal) * 100)) : (total > 0 ? Math.min(100, Math.round((onTime / total) * 100)) : 95);
 
-    for (const seg of donutSegments) {
-      const startAngle = (runningOffset / 100) * 360;
-      const endAngle = ((runningOffset + seg.pct) / 100) * 360;
-      runningOffset += seg.pct;
-
-      const x1 = cx + outerR * Math.cos(toRad(startAngle));
-      const y1 = cy + outerR * Math.sin(toRad(startAngle));
-      const x2 = cx + outerR * Math.cos(toRad(endAngle));
-      const y2 = cy + outerR * Math.sin(toRad(endAngle));
-
-      const x3 = cx + innerR * Math.cos(toRad(endAngle));
-      const y3 = cy + innerR * Math.sin(toRad(endAngle));
-      const x4 = cx + innerR * Math.cos(toRad(startAngle));
-      const y4 = cy + innerR * Math.sin(toRad(startAngle));
-
-      const largeArc = seg.pct > 50 ? 1 : 0;
-
-      const d = `
-        M ${x1} ${y1}
-        A ${outerR} ${outerR} 0 ${largeArc} 1 ${x2} ${y2}
-        L ${x3} ${y3}
-        A ${innerR} ${innerR} 0 ${largeArc} 0 ${x4} ${y4}
-        Z
-      `;
-      paths.push({ ...seg, d, startAngle, endAngle });
-    }
-
-    return paths;
-  }, [donutSegments]);
-
-  // Department chart data strictly filtered
-  const deptData = useMemo(() => {
-    if (!hasLiveExcelData) {
-      let f = 1.0;
-      if (regionFilter !== 'All') f = 0.45;
-      return [
-        { name: 'Operations', active: Math.round(24 * f), pending: Math.round(14 * f), total: Math.round(38 * f) },
-        { name: 'Maintenance', active: Math.round(10 * f), pending: Math.round(13 * f), total: Math.round(23 * f) },
-        { name: 'HSE', active: Math.round(5 * f), pending: Math.round(2 * f), total: Math.round(7 * f) },
-        { name: 'Admin', active: Math.round(5 * f), pending: Math.round(1 * f), total: Math.round(6 * f) }
-      ];
-    }
-
-    const depts = ['Operations', 'Maintenance', 'HSE', 'Admin'];
-    return depts.map((dName) => {
-      const permits = liveDataset.permits.filter((p) => {
-        if (p.department !== dName) return false;
-        if (regionFilter !== 'All' && p.region !== regionFilter) return false;
-        if (!globalAgencyFilters[p.agency]) return false;
-        return true;
-      });
-
-      const active = permits.filter((p) => p.status !== 'Overdue').length;
-      const pending = permits.filter((p) => p.status === 'Overdue').length;
-      return {
-        name: dName,
-        active: active || 1,
-        pending: pending || 1,
-        total: active + pending
-      };
-    });
-  }, [hasLiveExcelData, liveDataset.permits, regionFilter, globalAgencyFilters]);
-
-  // Frequency burden data strictly filtered
-  const frequencyData = useMemo(() => {
-    if (!hasLiveExcelData) {
-      return [
-        { label: 'Monthly', sub: '(SMRs / PMRs)', count: 126, pct: '55.3%' },
-        { label: 'Quarterly', sub: '(Reports)', count: 66, pct: '28.9%' },
-        { label: 'Annual', sub: '(Clearances / Permits)', count: 36, pct: '15.8%' }
-      ];
-    }
-
-    let mCount = 0;
-    let qCount = 0;
-    let aCount = 0;
-
-    liveDataset.reportorial.forEach((r) => {
-      if (regionFilter !== 'All' && r.region !== regionFilter) return;
-      if (departmentFilter !== 'All' && r.department !== departmentFilter) return;
-      if (selectedDeptChart && r.department !== selectedDeptChart) return;
-      if (!globalAgencyFilters[r.agency]) return;
-
-      const f = (r.frequency || '').toLowerCase();
-      if (f.includes('month')) mCount++;
-      else if (f.includes('quarter')) qCount++;
-      else if (f.includes('annual') || f.includes('year')) aCount++;
-      else qCount++;
-    });
-
-    const tot = mCount + qCount + aCount || 1;
-    return [
-      { label: 'Monthly', sub: '(SMRs / PMRs)', count: mCount || 126, pct: `${Math.round((mCount / tot) * 100)}%` },
-      { label: 'Quarterly', sub: '(Reports)', count: qCount || 66, pct: `${Math.round((qCount / tot) * 100)}%` },
-      { label: 'Annual', sub: '(Clearances / Permits)', count: aCount || 36, pct: `${Math.round((aCount / tot) * 100)}%` }
-    ];
-  }, [hasLiveExcelData, liveDataset.reportorial, regionFilter, departmentFilter, selectedDeptChart, globalAgencyFilters]);
+    return {
+      onTime,
+      late,
+      notSubmitted,
+      total,
+      denr,
+      dole,
+      doe,
+      compliance: compRate
+    };
+  }, [hasLiveExcelData, liveDataset.reportorial, regionFilter, businessFilter, effectiveFacilityFilter, statusFilter, agencyFilter, globalAgencyFilters]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -1051,99 +1113,121 @@ export default function HomeDashboard({
                     value={regionFilter}
                     onChange={(e) => {
                       setRegionFilter(e.target.value);
+                      setFacilityFilter('All');
                       setCurrentPage(1);
                     }}
                     className="dash-select"
                   >
                     <option value="All">All Regions (4)</option>
-                    <option value="North Luzon">North Luzon</option>
-                    <option value="South Luzon">South Luzon</option>
-                    <option value="Visayas">Visayas</option>
-                    <option value="Mindanao">Mindanao</option>
+                    <option value="North Luzon">North Luzon (8)</option>
+                    <option value="South Luzon">South Luzon (5)</option>
+                    <option value="Visayas">Visayas (6)</option>
+                    <option value="Mindanao">Mindanao (4)</option>
                   </select>
                   <span className="dash-select-chevron">▼</span>
                 </div>
               </div>
 
-              {/* Slicer 2: Department */}
+              {/* Slicer 2: Business (Changed from Department, from Compliance Summary Tab) */}
               <div className="dash-control-group">
-                <label className="dash-control-label" htmlFor="dashDeptSelect">
-                  Department
+                <label className="dash-control-label" htmlFor="dashBusinessSelect">
+                  Business
                 </label>
                 <div className="dash-select-wrap">
                   <select
-                    id="dashDeptSelect"
-                    value={departmentFilter}
+                    id="dashBusinessSelect"
+                    value={businessFilter}
                     onChange={(e) => {
-                      setDepartmentFilter(e.target.value);
+                      setBusinessFilter(e.target.value);
+                      setFacilityFilter('All');
                       setCurrentPage(1);
                     }}
                     className="dash-select"
                   >
-                    <option value="All">All Departments</option>
-                    <option value="Operations">Operations</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="HSE">HSE</option>
-                    <option value="Admin">Admin</option>
+                    <option value="All">All Businesses</option>
+                    <option value="BMP">BMP (Feedmill)</option>
+                    <option value="MPH">MPH (Hatchery)</option>
+                    <option value="MPPP">MPPP (Poultry Plant)</option>
+                    <option value="MPF">MPF (Breeding Farm)</option>
                   </select>
                   <span className="dash-select-chevron">▼</span>
                 </div>
               </div>
 
-              {/* Slicer 3: Deadline Horizon */}
+              {/* Slicer 3: Facilities (Added, from Compliance Summary Tab) */}
               <div className="dash-control-group">
-                <label className="dash-control-label" htmlFor="dashDeadlineSelect">
-                  Due Date Horizon
+                <label className="dash-control-label" htmlFor="dashFacilitySelect">
+                  Facilities
                 </label>
                 <div className="dash-select-wrap">
                   <select
-                    id="dashDeadlineSelect"
-                    value={deadlineFilter}
+                    id="dashFacilitySelect"
+                    value={effectiveFacilityFilter}
                     onChange={(e) => {
-                      setDeadlineFilter(e.target.value);
+                      setFacilityFilter(e.target.value);
                       setCurrentPage(1);
                     }}
                     className="dash-select"
                   >
-                    <option value="ALL">All Deadlines</option>
-                    <option value="OVERDUE">🚨 Overdue / Expired (&lt; 0d)</option>
-                    <option value="30D">🔥 Critical (Next 30 Days)</option>
-                    <option value="60D">⚡ At Risk (31-60 Days)</option>
-                    <option value="90D">📅 Upcoming (Next 90 Days)</option>
-                    <option value="STABLE">✅ Stable (&gt; 90 Days)</option>
+                    <option value="All">All Facilities ({availableFacilities.length})</option>
+                    {availableFacilities.map((fName) => (
+                      <option key={fName} value={fName}>
+                        {fName}
+                      </option>
+                    ))}
                   </select>
                   <span className="dash-select-chevron">▼</span>
                 </div>
               </div>
 
-              {/* Slicer 4: Search Box */}
-              <div className="dash-control-group dash-search-group">
-                <label className="dash-control-label" htmlFor="dashSearchInput">
-                  Search Dashboard
+              {/* Slicer 4: Status (Changed from Due Date Horizon, from Compliance Summary Tab) */}
+              <div className="dash-control-group">
+                <label className="dash-control-label" htmlFor="dashStatusSelect">
+                  Status
                 </label>
-                <div className="dash-search-wrap">
-                  <span className="search-icon">🔍</span>
-                  <input
-                    id="dashSearchInput"
-                    type="text"
-                    placeholder="Search permit, plant, owner, ID..."
-                    value={tableSearch}
+                <div className="dash-select-wrap">
+                  <select
+                    id="dashStatusSelect"
+                    value={statusFilter}
                     onChange={(e) => {
-                      setTableSearch(e.target.value);
+                      setStatusFilter(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="dash-search-input"
-                  />
-                  {tableSearch && (
-                    <button
-                      type="button"
-                      className="dash-clear-search-btn"
-                      onClick={() => setTableSearch('')}
-                      title="Clear search query"
-                    >
-                      ✕
-                    </button>
-                  )}
+                    className="dash-select"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Active">Active / Compliant</option>
+                    <option value="Action Required">Missing / Action Required</option>
+                    <option value="Upcoming">Upcoming Renewals</option>
+                    <option value="Critical">Critical (Next 30 Days)</option>
+                  </select>
+                  <span className="dash-select-chevron">▼</span>
+                </div>
+              </div>
+
+              {/* Slicer 5: Agency (Added, from Compliance Summary Tab) */}
+              <div className="dash-control-group">
+                <label className="dash-control-label" htmlFor="dashAgencySelect">
+                  Agency
+                </label>
+                <div className="dash-select-wrap">
+                  <select
+                    id="dashAgencySelect"
+                    value={agencyFilter}
+                    onChange={(e) => {
+                      setAgencyFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="dash-select"
+                  >
+                    <option value="All">All Agencies ({availableAgencies.length})</option>
+                    {availableAgencies.map((agency) => (
+                      <option key={agency} value={agency}>
+                        {agency}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="dash-select-chevron">▼</span>
                 </div>
               </div>
             </div>
@@ -1216,34 +1300,28 @@ export default function HomeDashboard({
                 <button type="button" onClick={() => setRegionFilter('All')}>✕</button>
               </span>
             )}
-            {departmentFilter !== 'All' && (
+            {businessFilter !== 'All' && (
               <span className="filter-chip">
-                Dept: {departmentFilter}
-                <button type="button" onClick={() => setDepartmentFilter('All')}>✕</button>
+                Business: {businessFilter}
+                <button type="button" onClick={() => setBusinessFilter('All')}>✕</button>
               </span>
             )}
-            {deadlineFilter !== 'ALL' && (
+            {effectiveFacilityFilter !== 'All' && (
               <span className="filter-chip">
-                Horizon: {deadlineFilter}
-                <button type="button" onClick={() => setDeadlineFilter('ALL')}>✕</button>
+                Facility: {effectiveFacilityFilter}
+                <button type="button" onClick={() => setFacilityFilter('All')}>✕</button>
               </span>
             )}
-            {selectedTimelineMonth && (
-              <span className="filter-chip highlight">
-                Month: {selectedTimelineMonth}
-                <button type="button" onClick={() => setSelectedTimelineMonth(null)}>✕</button>
+            {statusFilter !== 'All' && (
+              <span className="filter-chip">
+                Status: {statusFilter}
+                <button type="button" onClick={() => setStatusFilter('All')}>✕</button>
               </span>
             )}
-            {selectedDonutSegment && (
-              <span className="filter-chip highlight">
-                Report: {selectedDonutSegment}
-                <button type="button" onClick={() => setSelectedDonutSegment(null)}>✕</button>
-              </span>
-            )}
-            {selectedDeptChart && (
-              <span className="filter-chip highlight">
-                Dept Bar: {selectedDeptChart}
-                <button type="button" onClick={() => setSelectedDeptChart(null)}>✕</button>
+            {agencyFilter !== 'All' && (
+              <span className="filter-chip">
+                Agency: {agencyFilter}
+                <button type="button" onClick={() => setAgencyFilter('All')}>✕</button>
               </span>
             )}
             {tableSearch.trim() && (
@@ -1263,346 +1341,139 @@ export default function HomeDashboard({
         )}
       </section>
 
-      {/* 3. Executive KPI Cards Row */}
-      <section className="dash-kpi-grid" aria-label="Key Performance Indicators">
-        {/* KPI 1: Total Active Permits */}
-        <div className="dash-kpi-card card-cyan">
-          <div className="kpi-card-header">
-            <h4 className="kpi-card-title">Active Permits &amp; Licenses</h4>
-            <span className="kpi-badge cyan">Valid</span>
-          </div>
-          <div className="kpi-hero-num">{kpis.total}</div>
-          <div className="kpi-breakdown-row">
-            <span className="b-pill">DENR: <strong>{kpis.denr}</strong></span>
-            <span className="b-pill">DOLE: <strong>{kpis.dole}</strong></span>
-            <span className="b-pill">DOE: <strong>{kpis.doe}</strong></span>
+      {/* 3A. Permits & Licenses Summary Section */}
+      <section className="dash-kpi-section" aria-label="Permits &amp; Licenses Key Performance Indicators">
+        <div className="dash-kpi-section-header">
+          <div className="kpi-section-title-wrap">
+            <span className="kpi-section-icon">📜</span>
+            <h3 className="kpi-section-title">Permits &amp; Licenses Summary</h3>
+            <span className="kpi-section-count-tag">{kpis.total} Total Permits</span>
           </div>
         </div>
 
-        {/* KPI 2: Expired / Overdue */}
-        <div className="dash-kpi-card card-rose">
-          <div className="kpi-card-header">
-            <h4 className="kpi-card-title">Expired / Overdue</h4>
-            <span className="kpi-badge rose">Action Needed</span>
-          </div>
-          <div className="kpi-hero-num text-rose">{kpis.expired}</div>
-          <div className="kpi-sub-text text-rose">
-            Immediate filing / renewal required
-          </div>
-        </div>
-
-        {/* KPI 3: Due in ≤ 30 Days */}
-        <div className="dash-kpi-card card-amber">
-          <div className="kpi-card-header">
-            <h4 className="kpi-card-title">Expiring in ≤ 30 Days</h4>
-            <span className="kpi-badge amber">High Priority</span>
-          </div>
-          <div className="kpi-hero-num text-amber">{kpis.dueUnder30}</div>
-          <div className="kpi-sub-text text-amber">
-            Upcoming renewals within 30 days
-          </div>
-        </div>
-
-        {/* KPI 4: Compliance Rate */}
-        <div className="dash-kpi-card card-emerald">
-          <div className="kpi-card-header">
-            <h4 className="kpi-card-title">Compliance Health Score</h4>
-            <span className="kpi-badge emerald">Enterprise</span>
-          </div>
-          <div className="kpi-hero-num text-emerald">{kpis.compliance}%</div>
-          <div className="kpi-progress-bar-wrap">
-            <div
-              className="kpi-progress-bar-fill"
-              style={{ width: `${kpis.compliance}%` }}
-            ></div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. Interactive Analytics Charts (Side by Side) */}
-      <section className="dash-charts-grid">
-        {/* Left Chart: Expiration Timeline */}
-        <div className="dash-chart-card timeline-card">
-          <div className="card-header-row">
-            <div className="header-titles">
-              <h3 className="card-main-title">12-Month Expiration &amp; Renewal Timeline</h3>
-              <p className="card-sub-title">
-                {selectedTimelineMonth ? `Filtered by ${selectedTimelineMonth} (Click again to clear)` : 'Click any month bar to cross-filter the priority table'}
-              </p>
+        <div className="dash-kpi-grid">
+          {/* KPI 1: Total Active Permits */}
+          <div className="dash-kpi-card card-cyan">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Active Permits &amp; Licenses</h4>
+              <span className="kpi-badge cyan">Valid</span>
             </div>
-            <div className="timeline-legend">
-              <span className="leg-item"><span className="leg-dot critical">●</span> &lt;30d</span>
-              <span className="leg-item"><span className="leg-dot atrisk">●</span> 31-60d</span>
-              <span className="leg-item"><span className="leg-dot stable">●</span> &gt;60d</span>
+            <div className="kpi-hero-num">{kpis.total}</div>
+            <div className="kpi-breakdown-row">
+              <span className="b-pill">DENR: <strong>{kpis.denr}</strong></span>
+              <span className="b-pill">DOLE: <strong>{kpis.dole}</strong></span>
+              <span className="b-pill">DOE: <strong>{kpis.doe}</strong></span>
             </div>
           </div>
 
-          <div className="chart-container timeline-container">
-            <svg viewBox="0 0 600 200" className="timeline-svg" preserveAspectRatio="xMidYMid meet" style={{ overflow: 'hidden' }}>
-              <line x1="30" y1="168" x2="590" y2="168" stroke="currentColor" opacity="0.2" strokeWidth="1" />
-              <line x1="30" y1="120" x2="590" y2="120" stroke="currentColor" opacity="0.08" strokeWidth="1" strokeDasharray="4 4" />
-              <line x1="30" y1="70" x2="590" y2="70" stroke="currentColor" opacity="0.08" strokeWidth="1" strokeDasharray="4 4" />
-
-              {(() => {
-                const maxMonthTotal = Math.max(...timelineMonths.map((m) => m.total), 1);
-                // Baseline is 168. Available height to y=35 is 133px.
-                const maxBarHeight = 125;
-                const scale = maxBarHeight / Math.max(maxMonthTotal, 35);
-
-                return timelineMonths.map((item, idx) => {
-                  const barWidth = 32;
-                  const slotWidth = (600 - 40) / 12;
-                  const x = 35 + idx * slotWidth;
-
-                  const hCrit = item.critical * scale;
-                  const hRisk = item.atRisk * scale;
-                  const hStab = item.stable * scale;
-
-                  const baseY = 168;
-                  const yCrit = baseY - hCrit;
-                  const yRisk = yCrit - hRisk;
-                  const yStab = yRisk - hStab;
-
-                  const isSelected = selectedTimelineMonth === item.month;
-
-                  return (
-                    <g
-                      key={item.month}
-                      className={`bar-group ${isSelected ? 'selected' : ''}`}
-                      onClick={() => {
-                        setSelectedTimelineMonth(isSelected ? null : item.month);
-                        setCurrentPage(1);
-                      }}
-                      onMouseEnter={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        setTooltipState({
-                          title: `${item.month} 2026-2027 Expirations`,
-                          items: [
-                            `Total Expiring: ${item.total}`,
-                            `Critical (<30d): ${item.critical}`,
-                            `At Risk (31-60d): ${item.atRisk}`,
-                            `Stable (>60d): ${item.stable}`
-                          ],
-                          x: rect.left + rect.width / 2,
-                          y: rect.top - 10
-                        });
-                      }}
-                      onMouseLeave={() => setTooltipState(null)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {/* Critical segment (Red) */}
-                      {item.critical > 0 && (
-                        <rect x={x} y={yCrit} width={barWidth} height={hCrit} fill="#f43f5e" rx="1" />
-                      )}
-                      {/* At Risk segment (Orange) */}
-                      {item.atRisk > 0 && (
-                        <rect x={x} y={yRisk} width={barWidth} height={hRisk} fill="#f59e0b" rx="1" />
-                      )}
-                      {/* Stable segment (Green) */}
-                      {item.stable > 0 && (
-                        <rect x={x} y={yStab} width={barWidth} height={hStab} fill="#10b981" rx="2" />
-                      )}
-
-                      {/* Value on top */}
-                      <text x={x + barWidth / 2} y={Math.max(16, yStab - 4)} textAnchor="middle" className="bar-val-text">
-                        {item.total}
-                      </text>
-
-                      {/* Month Label */}
-                      <text x={x + barWidth / 2} y="186" textAnchor="middle" className="bar-axis-text">
-                        {item.month}
-                      </text>
-                    </g>
-                  );
-                });
-              })()}
-            </svg>
-          </div>
-        </div>
-
-        {/* Right Chart: Reportorial Requirements Donut */}
-        <div className="dash-chart-card donut-card">
-          <div className="card-header-row">
-            <div className="header-titles">
-              <h3 className="card-main-title">Reportorial Compliance Breakdown</h3>
-              <p className="card-sub-title">Distribution across mandatory regulatory reports</p>
+          {/* KPI 2: Expired / Overdue */}
+          <div className="dash-kpi-card card-rose">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Expired / Overdue</h4>
+              <span className="kpi-badge rose">Action Needed</span>
             </div>
-            {selectedDonutSegment && (
-              <button
-                type="button"
-                className="btn-clear-subfilter"
-                onClick={() => setSelectedDonutSegment(null)}
-              >
-                Clear
-              </button>
-            )}
+            <div className="kpi-hero-num text-rose">{kpis.expired}</div>
+            <div className="kpi-sub-text text-rose">
+              Immediate filing / renewal required
+            </div>
           </div>
 
-          <div className="donut-layout-wrap">
-            <div className="donut-svg-box">
-              <svg viewBox="0 0 220 220" className="donut-svg">
-                {donutPaths.map((seg) => (
-                  <path
-                    key={seg.label}
-                    d={seg.d}
-                    fill={seg.color}
-                    className={`donut-path ${selectedDonutSegment === seg.label ? 'selected' : ''}`}
-                    onClick={() => {
-                      setSelectedDonutSegment(selectedDonutSegment === seg.label ? null : seg.label);
-                      setCurrentPage(1);
-                    }}
-                    style={{ cursor: 'pointer' }}
-                  />
-                ))}
-              </svg>
-              <div className="donut-center-info">
-                <span className="donut-big-pct">85%</span>
-                <span className="donut-center-sub">On-Time SMR</span>
-              </div>
+          {/* KPI 3: Due in ≤ 30 Days */}
+          <div className="dash-kpi-card card-amber">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Expiring in ≤ 30 Days</h4>
+              <span className="kpi-badge amber">High Priority</span>
             </div>
+            <div className="kpi-hero-num text-amber">{kpis.dueUnder30}</div>
+            <div className="kpi-sub-text text-amber">
+              Upcoming renewals within 30 days
+            </div>
+          </div>
 
-            <div className="donut-legend-list">
-              {donutSegments.map((seg) => (
-                <div
-                  key={seg.label}
-                  className={`donut-leg-row ${selectedDonutSegment === seg.label ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedDonutSegment(selectedDonutSegment === seg.label ? null : seg.label);
-                    setCurrentPage(1);
-                  }}
-                  title={`Filter by ${seg.label}`}
-                >
-                  <span className="leg-color-dot" style={{ backgroundColor: seg.color }}></span>
-                  <span className="leg-lbl">{seg.label}</span>
-                  <span className="leg-pct">{seg.pct}%</span>
-                </div>
-              ))}
+          {/* KPI 4: Compliance Rate */}
+          <div className="dash-kpi-card card-emerald">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Compliance Health Score</h4>
+              <span className="kpi-badge emerald">Enterprise</span>
+            </div>
+            <div className="kpi-hero-num text-emerald">{kpis.compliance}%</div>
+            <div className="kpi-progress-bar-wrap">
+              <div
+                className="kpi-progress-bar-fill"
+                style={{ width: `${kpis.compliance}%` }}
+              ></div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 5. Operational Breakdown Row */}
-      <section className="dash-breakdown-grid">
-        {/* Left: Department Compliance */}
-        <div className="dash-chart-card dept-card">
-          <div className="card-header-row">
-            <div className="header-titles">
-              <h3 className="card-main-title">Permits &amp; Filings by Department</h3>
-              <p className="card-sub-title">Active vs Pending regulatory workload</p>
-            </div>
-            <div className="dept-legend">
-              <span className="leg-item"><span className="leg-dot active-blue">●</span> Active</span>
-              <span className="leg-item"><span className="leg-dot pending-orange">●</span> Pending</span>
-            </div>
-          </div>
-
-          <div className="chart-container dept-chart-wrap">
-            <svg viewBox="0 0 280 160" className="dept-svg" preserveAspectRatio="xMidYMid meet" style={{ overflow: 'hidden' }}>
-              <line x1="25" y1="135" x2="270" y2="135" stroke="currentColor" opacity="0.2" strokeWidth="1" />
-              <line x1="25" y1="85" x2="270" y2="85" stroke="currentColor" opacity="0.08" strokeWidth="1" strokeDasharray="4 4" />
-              <line x1="25" y1="35" x2="270" y2="35" stroke="currentColor" opacity="0.08" strokeWidth="1" strokeDasharray="4 4" />
-
-              {(() => {
-                const maxDept = Math.max(...deptData.map((d) => d.total), 1);
-                const maxBarH = 95;
-                const scale = maxBarH / Math.max(maxDept, 25);
-
-                return deptData.map((d, i) => {
-                  const colW = 32;
-                  const colX = 35 + i * 62;
-
-                  const hActive = d.active * scale;
-                  const hPending = d.pending * scale;
-
-                  const baseY = 135;
-                  const yActive = baseY - hActive;
-                  const yPending = yActive - hPending;
-
-                  const isDeptSelected = selectedDeptChart === d.name;
-
-                  return (
-                    <g
-                      key={d.name}
-                      className={`dept-bar-group ${isDeptSelected ? 'selected' : ''}`}
-                      onClick={() => {
-                        setSelectedDeptChart(isDeptSelected ? null : d.name);
-                        setCurrentPage(1);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {/* Pending segment (Orange) */}
-                      {hPending > 0 && (
-                        <rect x={colX} y={yPending} width={colW} height={hPending} fill="#f59e0b" rx="2" />
-                      )}
-                      {/* Active segment (Blue) */}
-                      {hActive > 0 && (
-                        <rect x={colX} y={yActive} width={colW} height={hActive} fill="#3b82f6" rx="2" />
-                      )}
-
-                      <text x={colX + colW / 2} y={Math.max(16, yPending - 4)} textAnchor="middle" className="bar-val-text">
-                        {d.total}
-                      </text>
-                      <text x={colX + colW / 2} y="150" textAnchor="middle" className="bar-axis-text">
-                        {d.name}
-                      </text>
-                    </g>
-                  );
-                });
-              })()}
-            </svg>
+      {/* 3B. Reportorial Requirements Summary Section */}
+      <section className="dash-kpi-section" aria-label="Reportorial Requirements Key Performance Indicators">
+        <div className="dash-kpi-section-header">
+          <div className="kpi-section-title-wrap">
+            <span className="kpi-section-icon">📑</span>
+            <h3 className="kpi-section-title">Reportorial Requirements Summary</h3>
+            <span className="kpi-section-count-tag">{reportorialKpis.total} Total Reports</span>
           </div>
         </div>
 
-        {/* Right: Submission Frequency Burden */}
-        <div className="dash-chart-card freq-card">
-          <div className="card-header-row">
-            <div className="header-titles">
-              <h3 className="card-main-title">Reporting Frequency Burden</h3>
-              <p className="card-sub-title">Workload distribution across recurring intervals</p>
+        <div className="dash-kpi-grid">
+          {/* Card 1: Submitted On-Time */}
+          <div className="dash-kpi-card card-cyan">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Submitted On-Time</h4>
+              <span className="kpi-badge cyan">On Schedule</span>
             </div>
-            {selectedFrequency && (
-              <button
-                type="button"
-                className="btn-clear-subfilter"
-                onClick={() => setSelectedFrequency(null)}
-              >
-                Clear
-              </button>
-            )}
+            <div className="kpi-hero-num">{reportorialKpis.onTime}</div>
+            <div className="kpi-breakdown-row">
+              <span className="b-pill">DENR: <strong>{reportorialKpis.denr}</strong></span>
+              <span className="b-pill">DOLE: <strong>{reportorialKpis.dole}</strong></span>
+              <span className="b-pill">DOE: <strong>{reportorialKpis.doe}</strong></span>
+            </div>
           </div>
 
-          <div className="freq-cards-stack">
-            {frequencyData.map((item) => {
-              const isSelected = selectedFrequency === item.label;
-              return (
-                <div
-                  key={item.label}
-                  className={`freq-progress-item ${isSelected ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedFrequency(isSelected ? null : item.label);
-                    setCurrentPage(1);
-                  }}
-                  title={`Filter by ${item.label} reports`}
-                >
-                  <div className="freq-item-top">
-                    <span className="freq-name">{item.label} <small>{item.sub}</small></span>
-                    <span className="freq-count">{item.count} items <strong>({item.pct})</strong></span>
-                  </div>
-                  <div className="freq-track">
-                    <div
-                      className={`freq-fill ${item.label.toLowerCase()}`}
-                      style={{ width: item.pct }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
+          {/* Card 2: Late Submission */}
+          <div className="dash-kpi-card card-amber">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Late Submission</h4>
+              <span className="kpi-badge amber">Delayed</span>
+            </div>
+            <div className="kpi-hero-num text-amber">{reportorialKpis.late}</div>
+            <div className="kpi-sub-text text-amber">
+              Submissions recorded past deadline
+            </div>
+          </div>
+
+          {/* Card 3: Not Submitted */}
+          <div className="dash-kpi-card card-rose">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Not Submitted</h4>
+              <span className="kpi-badge rose">Action Needed</span>
+            </div>
+            <div className="kpi-hero-num text-rose">{reportorialKpis.notSubmitted}</div>
+            <div className="kpi-sub-text text-rose">
+              Missing mandatory compliance filings
+            </div>
+          </div>
+
+          {/* Card 4: Compliance Health Score */}
+          <div className="dash-kpi-card card-emerald">
+            <div className="kpi-card-header">
+              <h4 className="kpi-card-title">Compliance Health Score</h4>
+              <span className="kpi-badge emerald">Reportorial</span>
+            </div>
+            <div className="kpi-hero-num text-emerald">{reportorialKpis.compliance}%</div>
+            <div className="kpi-progress-bar-wrap">
+              <div
+                className="kpi-progress-bar-fill"
+                style={{ width: `${reportorialKpis.compliance}%` }}
+              ></div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 6. Priority Compliance Actions & Renewals Table Card */}
+      {/* 4. Priority Compliance Actions & Renewals Table Card */}
       <section className="dash-table-card" aria-label="Urgent Regulatory Actions Table">
         <div className="dash-table-header">
           <div className="table-header-left">
@@ -1610,37 +1481,70 @@ export default function HomeDashboard({
             <span className="table-count-tag">{filteredActions.length} Records</span>
           </div>
 
-          <div className="table-header-tabs">
-            <button
-              type="button"
-              className={`table-filter-tab ${tableStatusFilter === 'All' ? 'active' : ''}`}
-              onClick={() => {
-                setTableStatusFilter('All');
-                setCurrentPage(1);
-              }}
-            >
-              All Actions
-            </button>
-            <button
-              type="button"
-              className={`table-filter-tab overdue ${tableStatusFilter === 'Overdue' ? 'active' : ''}`}
-              onClick={() => {
-                setTableStatusFilter('Overdue');
-                setCurrentPage(1);
-              }}
-            >
-              Overdue Only ({filteredActions.filter(a => a.status === 'Overdue').length})
-            </button>
-            <button
-              type="button"
-              className={`table-filter-tab upcoming ${tableStatusFilter === 'Upcoming' ? 'active' : ''}`}
-              onClick={() => {
-                setTableStatusFilter('Upcoming');
-                setCurrentPage(1);
-              }}
-            >
-              Upcoming Renewals ({filteredActions.filter(a => a.status === 'Upcoming').length})
-            </button>
+          <div className="table-header-controls">
+            {/* Search Box */}
+            <div className="dash-table-search">
+              <span className="dash-table-search-icon">🔍</span>
+              <input
+                type="text"
+                placeholder="Search action item, facility, agency..."
+                value={tableSearch}
+                onChange={(e) => {
+                  setTableSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="dash-table-search-input"
+                aria-label="Search priority compliance actions"
+              />
+              {tableSearch && (
+                <button
+                  type="button"
+                  className="dash-table-search-clear"
+                  onClick={() => {
+                    setTableSearch('');
+                    setCurrentPage(1);
+                  }}
+                  title="Clear search"
+                  aria-label="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="table-header-tabs">
+              <button
+                type="button"
+                className={`table-filter-tab ${tableStatusFilter === 'All' ? 'active' : ''}`}
+                onClick={() => {
+                  setTableStatusFilter('All');
+                  setCurrentPage(1);
+                }}
+              >
+                All Actions
+              </button>
+              <button
+                type="button"
+                className={`table-filter-tab overdue ${tableStatusFilter === 'Overdue' ? 'active' : ''}`}
+                onClick={() => {
+                  setTableStatusFilter('Overdue');
+                  setCurrentPage(1);
+                }}
+              >
+                Overdue Only ({actionCounts.overdue})
+              </button>
+              <button
+                type="button"
+                className={`table-filter-tab upcoming ${tableStatusFilter === 'Upcoming' ? 'active' : ''}`}
+                onClick={() => {
+                  setTableStatusFilter('Upcoming');
+                  setCurrentPage(1);
+                }}
+              >
+                Upcoming Renewals ({actionCounts.upcoming})
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1682,8 +1586,9 @@ export default function HomeDashboard({
                 </tr>
               ) : (
                 paginatedActions.map((item) => {
-                  const isOverdue = item.daysRemaining < 0 || item.status === 'Overdue';
-                  const isCritical = item.daysRemaining >= 0 && item.daysRemaining <= 30;
+                  const noExpiry = item.isNoExpiry || isNoExpiryDate(item.dueDate);
+                  const isOverdue = !noExpiry && (item.daysRemaining !== null ? item.daysRemaining < 0 : item.status === 'Overdue');
+                  const isCritical = !noExpiry && item.daysRemaining !== null && item.daysRemaining >= 0 && item.daysRemaining <= 30;
 
                   return (
                     <tr
@@ -1710,14 +1615,27 @@ export default function HomeDashboard({
                       </td>
                       <td>{item.region}</td>
                       <td>{item.department}</td>
-                      <td className="td-date-cell">{item.dueDate}</td>
+                      <td className="td-date-cell">
+                        <span className="td-date-val">{item.dueDate}</span>
+                        {noExpiry && (
+                          <span className="td-date-subtag" title="No expiry / One-time filing only">
+                            One-Time / No Expiry
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <span
-                          className={`days-pill ${
-                            isOverdue ? 'overdue' : isCritical ? 'warning' : 'stable'
-                          }`}
+                          className={`days-pill ${noExpiry ? 'stable' : isOverdue ? 'overdue' : isCritical ? 'warning' : 'stable'}`}
                         >
-                          {item.daysRemaining < 0 ? `${item.daysRemaining}d` : `${item.daysRemaining}d`}
+                          {noExpiry
+                            ? 'No Expiry'
+                            : item.daysRemaining !== null && !isNaN(item.daysRemaining)
+                            ? item.daysRemaining < 0
+                              ? `${item.daysRemaining}d`
+                              : item.daysRemaining === 0
+                              ? 'Due Today'
+                              : `+${item.daysRemaining}d`
+                            : '—'}
                         </span>
                       </td>
                       <td className="td-officer-cell">{item.owner}</td>
@@ -1824,18 +1742,35 @@ export default function HomeDashboard({
                 </div>
                 <div className="meta-box">
                   <span className="meta-lbl">Due / Expiration Date</span>
-                  <span className="meta-val">{activeItemDetail.dueDate}</span>
+                  <span className="meta-val">
+                    {activeItemDetail.dueDate}
+                    {(activeItemDetail.isNoExpiry || isNoExpiryDate(activeItemDetail.dueDate)) && (
+                      <span className="meta-subtag"> (No Expiry / One-Time Only)</span>
+                    )}
+                  </span>
                 </div>
                 <div className="meta-box">
                   <span className="meta-lbl">Days Remaining</span>
                   <span
                     className={`meta-val ${
-                      activeItemDetail.daysRemaining < 0 ? 'text-rose' : 'text-emerald'
+                      activeItemDetail.isNoExpiry || isNoExpiryDate(activeItemDetail.dueDate)
+                        ? 'text-emerald'
+                        : activeItemDetail.daysRemaining !== null && activeItemDetail.daysRemaining < 0
+                        ? 'text-rose'
+                        : activeItemDetail.daysRemaining !== null && activeItemDetail.daysRemaining <= 30
+                        ? 'text-amber'
+                        : 'text-emerald'
                     }`}
                   >
-                    {activeItemDetail.daysRemaining < 0
-                      ? `${activeItemDetail.daysRemaining} days (OVERDUE)`
-                      : `${activeItemDetail.daysRemaining} days remaining`}
+                    {activeItemDetail.isNoExpiry || isNoExpiryDate(activeItemDetail.dueDate)
+                      ? 'No Expiry / One-Time Only'
+                      : activeItemDetail.daysRemaining !== null && !isNaN(activeItemDetail.daysRemaining)
+                      ? activeItemDetail.daysRemaining < 0
+                        ? `${activeItemDetail.daysRemaining} days (OVERDUE)`
+                        : activeItemDetail.daysRemaining === 0
+                        ? 'Due Today'
+                        : `+${activeItemDetail.daysRemaining} days remaining`
+                      : 'Not Applicable'}
                   </span>
                 </div>
                 <div className="meta-box">
@@ -1878,19 +1813,6 @@ export default function HomeDashboard({
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Floating SVG Tooltip */}
-      {tooltipState && (
-        <div
-          className="dash-floating-tooltip"
-          style={{ left: `${tooltipState.x}px`, top: `${tooltipState.y}px` }}
-        >
-          <div className="tooltip-heading">{tooltipState.title}</div>
-          {tooltipState.items.map((it, idx) => (
-            <div key={idx} className="tooltip-row">{it}</div>
-          ))}
         </div>
       )}
     </div>

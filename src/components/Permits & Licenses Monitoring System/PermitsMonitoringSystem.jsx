@@ -60,6 +60,7 @@ export default function PermitsMonitoringSystem({
         <HomeDashboard
           onNavigateToTable={handleNavigateToTable}
           parsedDataCache={parsedDataCache}
+          summaryData={summaryData}
           targetSheets={targetSheets}
           plantRegions={plantRegions}
           isLoading={isLoading}

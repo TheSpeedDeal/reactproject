@@ -123,9 +123,20 @@ export default function DisplayTables({
     const expiredPermits = permits.filter((p) => p.status === 'Expired').length;
     const noPermitCount = permits.filter((p) => p.status === 'No Permit').length;
 
-    const onTimeReports = reportorial.filter((r) => r.status === 'Submitted On-time').length;
-    const lateReports = reportorial.filter((r) => r.status === 'Late Submission').length;
-    const notSubmittedReports = reportorial.filter((r) => r.status === 'Not Submitted').length;
+    const onTimeReports = reportorial.filter((r) => {
+      const s = String(r.status || '').toLowerCase().trim();
+      return s.includes('on-time') || s.includes('on time') || s === 'submitted' || s.includes('compliant') || s === 'updated';
+    }).length;
+
+    const lateReports = reportorial.filter((r) => {
+      const s = String(r.status || '').toLowerCase().trim();
+      return s.includes('late');
+    }).length;
+
+    const notSubmittedReports = reportorial.filter((r) => {
+      const s = String(r.status || '').toLowerCase().trim();
+      return s.includes('not submitted') || s.includes('missing') || s === 'unsubmitted' || s.includes('non-compliant');
+    }).length;
 
     const totalPermits = permits.length;
     const totalReports = reportorial.length;
@@ -133,6 +144,10 @@ export default function DisplayTables({
     const complianceRate = totalPermits > 0
       ? Math.round((activePermits / totalPermits) * 100)
       : 95;
+
+    const reportComplianceRate = totalReports > 0
+      ? Math.round((onTimeReports / totalReports) * 100)
+      : 100;
 
     return {
       activePermits,
@@ -144,7 +159,8 @@ export default function DisplayTables({
       notSubmittedReports,
       totalPermits,
       totalReports,
-      complianceRate
+      complianceRate,
+      reportComplianceRate
     };
   }, [currentSheetData]);
 
@@ -519,41 +535,73 @@ export default function DisplayTables({
               </div>
               <h2 className="hero-plant-name">{activeSheetName || 'No Plant Selected'}</h2>
               <p className="hero-plant-desc">
-                Displaying 2 Compliance Tables: <strong>Permit and Licenses</strong> ({currentSheetData.permits.length} items) &amp; <strong>Reportorial Requirements</strong> ({currentSheetData.reportorial.length} items)
+                {viewMode === 'permits' ? (
+                  <>
+                    Displaying Table 1: <strong>Permit and Licenses</strong> ({currentSheetData.permits.length} items) &bull; Operating clearances, environmental permits, and agency registrations
+                  </>
+                ) : (
+                  <>
+                    Displaying Table 2: <strong>Reportorial Requirements</strong> ({currentSheetData.reportorial.length} items) &bull; Periodic compliance submissions, SMR, PMR, and mandatory monitoring reports
+                  </>
+                )}
               </p>
             </div>
 
-            {/* KPI Metric Cards */}
-            <div className="hero-kpi-grid">
-              <div className="kpi-card kpi-success">
-                <div className="kpi-val">{metrics.activePermits}</div>
-                <div className="kpi-label">Active Permits</div>
-                <div className="kpi-sub">Valid compliance</div>
-              </div>
+            {/* KPI Metric Cards - Dynamically switches based on active table (viewMode) */}
+            <div className="hero-kpi-grid" key={viewMode}>
+              {viewMode === 'permits' ? (
+                <>
+                  <div className="kpi-card kpi-success">
+                    <div className="kpi-val">{metrics.activePermits}</div>
+                    <div className="kpi-label">Active Permits</div>
+                    <div className="kpi-sub">Valid ({metrics.totalPermits} Total)</div>
+                  </div>
 
-              <div className="kpi-card kpi-warning">
-                <div className="kpi-val">{metrics.expiringSoonPermits}</div>
-                <div className="kpi-label">Expiring Soon</div>
-                <div className="kpi-sub">&le; 60 days left</div>
-              </div>
+                  <div className="kpi-card kpi-warning">
+                    <div className="kpi-val">{metrics.expiringSoonPermits}</div>
+                    <div className="kpi-label">Expiring Soon</div>
+                    <div className="kpi-sub">&le; 60 days left</div>
+                  </div>
 
-              <div className="kpi-card kpi-danger">
-                <div className="kpi-val">{metrics.expiredPermits + metrics.noPermitCount}</div>
-                <div className="kpi-label">Expired / Missing</div>
-                <div className="kpi-sub">Immediate action</div>
-              </div>
+                  <div className="kpi-card kpi-danger">
+                    <div className="kpi-val">{metrics.expiredPermits + metrics.noPermitCount}</div>
+                    <div className="kpi-label">Expired / Missing</div>
+                    <div className="kpi-sub">Immediate action</div>
+                  </div>
 
-              <div className="kpi-card kpi-info">
-                <div className="kpi-val">{metrics.onTimeReports}</div>
-                <div className="kpi-label">Reports On-Time</div>
-                <div className="kpi-sub">Out of {metrics.totalReports}</div>
-              </div>
+                  <div className="kpi-card kpi-accent">
+                    <div className="kpi-val">{metrics.complianceRate}%</div>
+                    <div className="kpi-label">Compliance Rate</div>
+                    <div className="kpi-sub">Permit health score</div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="kpi-card kpi-info">
+                    <div className="kpi-val">{metrics.onTimeReports}</div>
+                    <div className="kpi-label">Submitted On-Time</div>
+                    <div className="kpi-sub">On schedule ({metrics.totalReports} Total)</div>
+                  </div>
 
-              <div className="kpi-card kpi-accent">
-                <div className="kpi-val">{metrics.complianceRate}%</div>
-                <div className="kpi-label">Compliance Rate</div>
-                <div className="kpi-sub">Facility health</div>
-              </div>
+                  <div className="kpi-card kpi-warning">
+                    <div className="kpi-val">{metrics.lateReports}</div>
+                    <div className="kpi-label">Late Submission</div>
+                    <div className="kpi-sub">Past deadline</div>
+                  </div>
+
+                  <div className="kpi-card kpi-danger">
+                    <div className="kpi-val">{metrics.notSubmittedReports}</div>
+                    <div className="kpi-label">Not Submitted</div>
+                    <div className="kpi-sub">Immediate action</div>
+                  </div>
+
+                  <div className="kpi-card kpi-accent">
+                    <div className="kpi-val">{metrics.reportComplianceRate}%</div>
+                    <div className="kpi-label">Compliance Health</div>
+                    <div className="kpi-sub">Reportorial health score</div>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 

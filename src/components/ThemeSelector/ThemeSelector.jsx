@@ -3,7 +3,7 @@ import { THEMES } from '../../utils/themeConfig';
 import './ThemeSelector.css';
 
 export default function ThemeSelector({
-  currentTheme = 'midnight',
+  currentTheme = 'light',
   onSelectTheme,
   variant = 'main-header'
 }) {

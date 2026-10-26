@@ -24,17 +24,17 @@ const ENTERPRISE_MODULES = [
     isActive: true,
     desc: 'Comprehensive compliance tracking for operating clearances, environmental discharge permits, DOLE registrations, local government permits, and regulatory deadlines across all 23 facilities.',
     capabilities: [
-      '12-Month Expiration Timeline',
       'Interactive Slicer Controls',
-      'Reportorial SMR/PMR Donut',
+      'Priority Compliance Actions',
       'Full 23-Plant Display Tables',
+      'Executive KPI Health Metrics',
       'CSV Data Export'
     ],
     metrics: '1,450 Permits • 23 Facilities • 94% Rate',
     highlights: [
       'Automated expiration horizon alerting for 30/60/90-day compliance deadlines',
       'Integrated cross-filtering across 23 plants and 4 geographic regions',
-      'Instant reportorial SMR and PMR submission status tracking'
+      'Instant priority action tracking with detail drill-down'
     ]
   },
   {
