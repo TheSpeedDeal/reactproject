@@ -427,10 +427,10 @@ export default function App() {
   }, []);
 
   // Process ArrayBuffer from fetch or file picker
-  const processWorkbookData = useCallback((data, name, sizeStr, source) => {
+  const processWorkbookData = useCallback((arrayBuffer, name, sizeStr, source) => {
     try {
       setErrorMessage('');
-      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
 
       if (!wb.SheetNames || wb.SheetNames.length === 0) {
         throw new Error('This workbook does not contain any readable sheets.');
@@ -695,7 +695,8 @@ export default function App() {
         totalRecords: totalRows,
         uploadedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         status: 'Ready in Cache',
-        workbook: wb
+        workbook: wb,
+        arrayBuffer
       };
 
       setModuleDatasets((prev) => {
@@ -769,8 +770,8 @@ export default function App() {
             {activeMainModule === 'hub'
               ? '🏢'
               : activeMainModule === 'sourceExcel'
-              ? '📊'
-              : (currentActiveModule?.icon || '📜')}
+                ? '📊'
+                : (currentActiveModule?.icon || '📜')}
           </div>
           <div className="brand-titles">
             <div className="brand-badge-row">
@@ -779,31 +780,31 @@ export default function App() {
                 {activeMainModule === 'hub'
                   ? '2026 Operations Portal'
                   : activeMainModule === 'sourceExcel'
-                  ? 'Master Data Sources'
-                  : (currentActiveModule?.name || 'Monitoring System')}
+                    ? 'Master Data Sources'
+                    : (currentActiveModule?.name || 'Monitoring System')}
               </span>
               <span className="badge-live-pulse">
                 <span className="live-dot"></span>
                 {activeMainModule === 'hub'
                   ? 'Central Hub Live'
                   : activeMainModule === 'sourceExcel'
-                  ? 'Data Pipeline Active'
-                  : (currentActiveModule?.status || 'Active System')}
+                    ? 'Data Pipeline Active'
+                    : (currentActiveModule?.status || 'Active System')}
               </span>
             </div>
             <h1 className="brand-main-title">
               {activeMainModule === 'hub'
                 ? 'Operations & Regulatory Compliance Portal'
                 : activeMainModule === 'sourceExcel'
-                ? 'SourceExcel • Module Master Spreadsheets'
-                : (currentActiveModule?.name || 'Operations Portal')}
+                  ? 'SourceExcel • Module Master Spreadsheets'
+                  : (currentActiveModule?.name || 'Operations Portal')}
             </h1>
             <p className="brand-sub-title">
               {activeMainModule === 'hub'
                 ? 'Central intelligence hub • 23 industrial operating facilities • Enterprise regulatory monitoring'
                 : activeMainModule === 'sourceExcel'
-                ? 'Configure master Excel workbooks • Upload sheets per module • Switch active workbooks'
-                : `Comprehensive regulatory monitoring for ${targetSheets.length || 23} operating facilities`}
+                  ? 'Configure master Excel workbooks • Upload sheets per module • Switch active workbooks'
+                  : `Comprehensive regulatory monitoring for ${targetSheets.length || 23} operating facilities`}
             </p>
           </div>
         </div>
