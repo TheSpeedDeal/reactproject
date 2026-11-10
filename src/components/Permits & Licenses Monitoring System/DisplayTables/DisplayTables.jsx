@@ -8,6 +8,7 @@ import './DisplayTables.css';
 
 export default function DisplayTables({
   parsedDataCache = {},
+  summaryData = { permitsSummary: null, reportorialSummary: null },
   targetSheets = [],
   plantRegions = {},
   activeSheetName: parentActiveSheetName,
@@ -113,6 +114,15 @@ export default function DisplayTables({
     return plantRegions[activeSheetName] || 'North Luzon';
   }, [activeSheetName, plantRegions]);
 
+  // Matching plant record from Excel summary sheets if available
+  const summaryPermitPlant = useMemo(() => {
+    return summaryData?.permitsSummary?.plants?.find((p) => p.plant === activeSheetName) || null;
+  }, [summaryData, activeSheetName]);
+
+  const summaryReportPlant = useMemo(() => {
+    return summaryData?.reportorialSummary?.plants?.find((p) => p.plant === activeSheetName) || null;
+  }, [summaryData, activeSheetName]);
+
   // Metrics for active plant
   const metrics = useMemo(() => {
     const permits = currentSheetData.permits || [];
@@ -123,9 +133,17 @@ export default function DisplayTables({
     const expiredPermits = permits.filter((p) => p.status === 'Expired').length;
     const noPermitCount = permits.filter((p) => p.status === 'No Permit').length;
 
+    // Filter applicable permits (excluding Not Applicable / N/A rows)
+    const applicablePermits = permits.filter((p) => {
+      const app = String(p.applicability || '').trim().toLowerCase();
+      const st = String(p.status || '').trim().toLowerCase();
+      return app !== 'not applicable' && st !== 'n/a';
+    });
+    const totalApplicablePermits = applicablePermits.length;
+
     const onTimeReports = reportorial.filter((r) => {
       const s = String(r.status || '').toLowerCase().trim();
-      return s.includes('on-time') || s.includes('on time') || s === 'submitted' || s.includes('compliant') || s === 'updated';
+      return s.includes('on-time') || s.includes('on time') || s === 'submitted' || s.includes('compliant');
     }).length;
 
     const lateReports = reportorial.filter((r) => {
@@ -138,16 +156,30 @@ export default function DisplayTables({
       return s.includes('not submitted') || s.includes('missing') || s === 'unsubmitted' || s.includes('non-compliant');
     }).length;
 
+    // Filter applicable reports (excluding Not Applicable / N/A rows)
+    const applicableReports = reportorial.filter((r) => {
+      const app = String(r.applicability || '').trim().toLowerCase();
+      const st = String(r.status || '').trim().toLowerCase();
+      return app !== 'not applicable' && st !== 'n/a';
+    });
+    const totalApplicableReports = applicableReports.length;
+
     const totalPermits = permits.length;
     const totalReports = reportorial.length;
 
-    const complianceRate = totalPermits > 0
-      ? Math.round((activePermits / totalPermits) * 100)
-      : 95;
+    // % Active: Matches Excel %Active from SUMMARY-Permits if available; otherwise (active / applicable)
+    const complianceRate = summaryPermitPlant?.complianceRate !== undefined
+      ? summaryPermitPlant.complianceRate
+      : (totalApplicablePermits > 0
+          ? Math.min(100, Math.round((activePermits / totalApplicablePermits) * 100))
+          : 100);
 
-    const reportComplianceRate = totalReports > 0
-      ? Math.round((onTimeReports / totalReports) * 100)
-      : 100;
+    // % Updated: Matches Excel % Updated from SUMMARY-Reportorial if available; otherwise (submitted / applicable)
+    const reportComplianceRate = summaryReportPlant?.complianceRate !== undefined
+      ? summaryReportPlant.complianceRate
+      : (totalApplicableReports > 0
+          ? Math.min(100, Math.round(((onTimeReports + lateReports) / totalApplicableReports) * 100))
+          : 100);
 
     return {
       activePermits,
@@ -157,12 +189,14 @@ export default function DisplayTables({
       onTimeReports,
       lateReports,
       notSubmittedReports,
+      totalApplicablePermits,
+      totalApplicableReports,
       totalPermits,
       totalReports,
       complianceRate,
       reportComplianceRate
     };
-  }, [currentSheetData]);
+  }, [currentSheetData, summaryPermitPlant, summaryReportPlant]);
 
   // Regulatory bodies for dropdowns
   const permitsRegulatoryBodies = useMemo(() => {
@@ -537,11 +571,11 @@ export default function DisplayTables({
               <p className="hero-plant-desc">
                 {viewMode === 'permits' ? (
                   <>
-                    Displaying Table 1: <strong>Permit and Licenses</strong> ({currentSheetData.permits.length} items) &bull; Operating clearances, environmental permits, and agency registrations
+                    Displaying Table 1: <strong>Permit and Licenses</strong> ({currentSheetData.permits.length} items &bull; {metrics.totalApplicablePermits} applicable) &bull; Operating clearances, environmental permits, and agency registrations
                   </>
                 ) : (
                   <>
-                    Displaying Table 2: <strong>Reportorial Requirements</strong> ({currentSheetData.reportorial.length} items) &bull; Periodic compliance submissions, SMR, PMR, and mandatory monitoring reports
+                    Displaying Table 2: <strong>Reportorial Requirements</strong> ({currentSheetData.reportorial.length} items &bull; {metrics.totalApplicableReports} applicable) &bull; Periodic compliance submissions, SMR, PMR, and mandatory monitoring reports
                   </>
                 )}
               </p>
@@ -554,7 +588,7 @@ export default function DisplayTables({
                   <div className="kpi-card kpi-success">
                     <div className="kpi-val">{metrics.activePermits}</div>
                     <div className="kpi-label">Active Permits</div>
-                    <div className="kpi-sub">Valid ({metrics.totalPermits} Total)</div>
+                    <div className="kpi-sub">Valid ({metrics.totalApplicablePermits} Applicable &bull; {metrics.totalPermits} Total)</div>
                   </div>
 
                   <div className="kpi-card kpi-warning">
@@ -571,8 +605,8 @@ export default function DisplayTables({
 
                   <div className="kpi-card kpi-accent">
                     <div className="kpi-val">{metrics.complianceRate}%</div>
-                    <div className="kpi-label">Compliance Rate</div>
-                    <div className="kpi-sub">Permit health score</div>
+                    <div className="kpi-label">% Active</div>
+                    <div className="kpi-sub">Active vs. Applicable</div>
                   </div>
                 </>
               ) : (
@@ -580,7 +614,7 @@ export default function DisplayTables({
                   <div className="kpi-card kpi-info">
                     <div className="kpi-val">{metrics.onTimeReports}</div>
                     <div className="kpi-label">Submitted On-Time</div>
-                    <div className="kpi-sub">On schedule ({metrics.totalReports} Total)</div>
+                    <div className="kpi-sub">On schedule ({metrics.totalApplicableReports} Applicable)</div>
                   </div>
 
                   <div className="kpi-card kpi-warning">
@@ -597,7 +631,7 @@ export default function DisplayTables({
 
                   <div className="kpi-card kpi-accent">
                     <div className="kpi-val">{metrics.reportComplianceRate}%</div>
-                    <div className="kpi-label">Compliance Health</div>
+                    <div className="kpi-label">Compliance Rate</div>
                     <div className="kpi-sub">Reportorial health score</div>
                   </div>
                 </>

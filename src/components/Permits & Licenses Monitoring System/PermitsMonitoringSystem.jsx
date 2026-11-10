@@ -88,6 +88,7 @@ export default function PermitsMonitoringSystem({
       {subTab === 'tables' && (
         <DisplayTables
           parsedDataCache={parsedDataCache}
+          summaryData={summaryData}
           targetSheets={targetSheets}
           plantRegions={plantRegions}
           activeSheetName={targetPlant}

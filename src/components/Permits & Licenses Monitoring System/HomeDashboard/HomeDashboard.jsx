@@ -282,8 +282,10 @@ function parseFlexibleDate(dateVal) {
     }
   }
 
-  // Handle M/D/YY or M/D/YYYY (e.g. "4/30/26", "04/30/2026")
-  const mdyMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  // Handle M/D/YY, M/D/YYYY, or missing slash before year (e.g. "12/082026")
+  const mdyMatch =
+    str.match(/^(\d{1,2})[/-](\d{1,2})[/-]?(\d{4})$/) ||
+    str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$/);
   if (mdyMatch) {
     const month = parseInt(mdyMatch[1], 10) - 1;
     const day = parseInt(mdyMatch[2], 10);
@@ -859,7 +861,18 @@ export default function HomeDashboard({
     const dueUnder30 = candidatePermits.filter((p) => !p.isNoExpiry && p.daysRemaining !== null && p.daysRemaining >= 0 && p.daysRemaining <= 30).length;
 
     const activeCount = candidatePermits.filter((p) => p.rawStatus === 'Active' && (p.isNoExpiry || p.daysRemaining === null || p.daysRemaining >= 0)).length;
-    const compRate = total > 0 ? Math.min(100, Math.round((activeCount / total) * 100)) : 94;
+
+    // Filter applicable permits (exclude Not Applicable / N/A items)
+    const applicablePermits = candidatePermits.filter((p) => {
+      const app = String(p.applicability || '').toLowerCase().trim();
+      const st = String(p.rawStatus || '').toLowerCase().trim();
+      return app !== 'not applicable' && st !== 'n/a';
+    });
+    const applicableTotal = applicablePermits.length;
+
+    const compRate = applicableTotal > 0
+      ? Math.min(100, Math.round((activeCount / applicableTotal) * 100))
+      : (total > 0 ? Math.min(100, Math.round((activeCount / total) * 100)) : 94);
 
     return {
       denr,
@@ -969,7 +982,9 @@ export default function HomeDashboard({
     const doe = candidateReports.filter((r) => r.agency === 'DOE' && isReportOnTime(r)).length;
 
     const evaluatedTotal = onTime + late + notSubmitted;
-    const compRate = evaluatedTotal > 0 ? Math.min(100, Math.round((onTime / evaluatedTotal) * 100)) : (total > 0 ? Math.min(100, Math.round((onTime / total) * 100)) : 95);
+    const compRate = evaluatedTotal > 0
+      ? Math.min(100, Math.round(((onTime + late) / evaluatedTotal) * 100))
+      : (total > 0 ? Math.min(100, Math.round(((onTime + late) / total) * 100)) : 95);
 
     return {
       onTime,
@@ -1393,11 +1408,11 @@ export default function HomeDashboard({
             </div>
           </div>
 
-          {/* KPI 4: Compliance Rate */}
+          {/* KPI 4: % Active */}
           <div className="dash-kpi-card card-emerald">
             <div className="kpi-card-header">
-              <h4 className="kpi-card-title">Compliance Health Score</h4>
-              <span className="kpi-badge emerald">Enterprise</span>
+              <h4 className="kpi-card-title">% Active</h4>
+              <span className="kpi-badge emerald">Applicable</span>
             </div>
             <div className="kpi-hero-num text-emerald">{kpis.compliance}%</div>
             <div className="kpi-progress-bar-wrap">
@@ -1459,10 +1474,10 @@ export default function HomeDashboard({
             </div>
           </div>
 
-          {/* Card 4: Compliance Health Score */}
+          {/* Card 4: Compliance Rate */}
           <div className="dash-kpi-card card-emerald">
             <div className="kpi-card-header">
-              <h4 className="kpi-card-title">Compliance Health Score</h4>
+              <h4 className="kpi-card-title">Compliance Rate</h4>
               <span className="kpi-badge emerald">Reportorial</span>
             </div>
             <div className="kpi-hero-num text-emerald">{reportorialKpis.compliance}%</div>

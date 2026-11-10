@@ -221,8 +221,8 @@ export default function SummaryTables({
 
           <div className="summary-kpi-card kpi-accent">
             <div className="kpi-val">{metrics.complianceRate}%</div>
-            <div className="kpi-label">Compliance Rate</div>
-            <div className="kpi-sub">Network health</div>
+            <div className="kpi-label">{activeTab === 'permits' ? '% Active' : 'Compliance Rate'}</div>
+            <div className="kpi-sub">{activeTab === 'permits' ? 'Active vs. Applicable' : 'Reportorial health'}</div>
           </div>
         </div>
       </section>

@@ -127,6 +127,30 @@ export function getFacilityType(sheetName) {
  * 1) Permits and Licenses
  * 2) Reportorial Requirements
  */
+function parseDaysRemainingFromDate(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const cleaned = dateStr.trim();
+  if (!cleaned || cleaned === 'N/A' || cleaned === '-' || cleaned === 'undefined') return null;
+  const m =
+    cleaned.match(/^(\d{1,2})[/-](\d{1,2})[/-]?(\d{4})$/) ||
+    cleaned.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$/);
+  let target = null;
+  if (m) {
+    const month = parseInt(m[1], 10) - 1;
+    const day = parseInt(m[2], 10);
+    let year = parseInt(m[3], 10);
+    if (year < 100) year += year >= 70 ? 1900 : 2000;
+    target = new Date(year, month, day);
+  } else {
+    const d = new Date(cleaned);
+    if (!isNaN(d.getTime())) target = d;
+  }
+  if (!target || isNaN(target.getTime())) return null;
+  const now = new Date();
+  const diffTime = target - now;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
 export function parsePlantWorksheet(ws, sheetName) {
   if (!ws) {
     return { permits: [], reportorial: [], title: sheetName, metadata: {} };
@@ -170,9 +194,13 @@ export function parsePlantWorksheet(ws, sheetName) {
     // Must have at least regulatory body or description
     if (!fRow[1] && !fRow[2]) continue;
 
-    const daysToExpireNum = rRow[8] !== undefined && rRow[8] !== '' && !isNaN(Number(rRow[8]))
+    let daysToExpireNum = rRow[8] !== undefined && rRow[8] !== '' && !isNaN(Number(rRow[8]))
       ? Math.round(Number(rRow[8]))
       : null;
+
+    if (daysToExpireNum === null && fRow[6]) {
+      daysToExpireNum = parseDaysRemainingFromDate(fRow[6]);
+    }
 
     const statusVal = fRow[7] ? fRow[7].trim() : 'N/A';
     const isExpiringSoon = statusVal === 'Active' && daysToExpireNum !== null && daysToExpireNum > 0 && daysToExpireNum <= 60;
@@ -353,6 +381,9 @@ export function parseSingleSummarySheet(ws, type = 'permits', sheetName = '') {
       if (cellVal === '✓' || cellVal === 'v' || cellVal === '1' || cellVal === 'yes' || cellVal === 'active') {
         status = 'compliant';
         compCount++;
+      } else if (cellVal === '^' || cellVal === 'late') {
+        status = 'late';
+        compCount++;
       } else if (cellVal === 'x' || cellVal === '0' || cellVal === 'no' || cellVal === 'inactive') {
         status = 'non-compliant';
         nonCompCount++;
@@ -469,10 +500,16 @@ export function parseSummarySheets(wb) {
     return l.includes('summary') && l.includes('permit');
   });
 
-  const reportorialSheetName = wb.SheetNames.find((s) => {
+  const summaryReportorialSheets = wb.SheetNames.filter((s) => {
     const l = s.toLowerCase().replace(/[^a-z0-9]/g, '');
     return l.includes('summary') && (l.includes('report') || l.includes('reportial'));
   });
+
+  // Prefer 'Summary-Reportorial_ ' if present since it has the updated caret (^) metrics
+  const reportorialSheetName =
+    summaryReportorialSheets.find((s) => s.includes('_')) ||
+    summaryReportorialSheets[0] ||
+    null;
 
   return {
     permitsSummary: permitsSheetName
